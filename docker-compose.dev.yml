@@ -1,0 +1,30 @@
+name: google-cloud-datastore-odm-dev
+services:
+  datastore:
+    image: gcr.io/google.com/cloudsdktool/google-cloud-cli:emulators
+    ports:
+      - "20000:8081"
+    volumes:
+      - datastore:/datastore
+    command: >
+      gcloud beta emulators datastore start
+      --project=google-cloud-datastore-odm-dev
+      --host-port=0.0.0.0:8081
+      --data-dir=/datastore
+      --consistency=1.0
+  emulators-ui:
+    image: ghcr.io/drehelis/gcp-emulator-ui:main
+    ports:
+      - "20002:80"
+    depends_on:
+      - datastore
+    environment:
+      DATASTORE_EMULATOR_URL: datastore:8081
+      # fill the rest with dummies as runtime needs them
+      STORAGE_EMULATOR_URL: host.docker.internal
+      PUBSUB_EMULATOR_URL: host.docker.internal
+      FIRESTORE_EMULATOR_URL: host.docker.internal
+      DATASTORE_FILE_SERVER_URL: host.docker.internal
+
+volumes:
+  datastore:
