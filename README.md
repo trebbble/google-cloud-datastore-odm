@@ -1,15 +1,22 @@
-### Local dev
-
+### Dependencies
 - `uv sync all-groups`
-- `docker compose -f docker-compose.dev.yml up -d --build`
-- Datastore emulator port: `20000` 
-- Datastore emulator UI port: `20002`
-- Set environment variables to use emulator:
-  - `GOOGLE_CLOUD_PROJECT=google-cloud-datastore-odm-dev`
-  - `DATASTORE_EMULATOR_HOST=localhost:20000`
+
+### Local emulators
+- `docker compose -f docker-compose.yml up -d --build`
+- `docker compose -f docker-compose.yml down --volumes`
+
+### Local usage
+- Datastore emulator for dev:
+    - `DATASTORE_EMULATOR_HOST=localhost:10000`
+    - `GOOGLE_CLOUD_PROJECT=google-cloud-datastore-odm-dev`
+- Datastore emulator for tests:
+    - `DATASTORE_EMULATOR_HOST=localhost:10001`
+    - `GOOGLE_CLOUD_PROJECT=google-cloud-datastore-odm-test`
+- Datastore emulator UI : `localhost:10002`
+
 
 ### Local tests:
-  - From root folder `docker compose -f docker-compose.test.yml up -d --build`
+  - From root folder `docker compose -f docker-compose.yml up -d --build` datastore-test
   - `uv run pytest` or `python3.12 -m pytest` 
 - Run linter `uv run ruff check`
 
@@ -60,5 +67,3 @@
 - [ ] Async model operations
 - [ ] Async query support
 - [ ] Async transaction support
-
-

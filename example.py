@@ -1,22 +1,21 @@
-import os
 from src.google_cloud_datastore_odm import Model, StringField, IntegerField
+from dotenv import load_dotenv
 
-os.environ['DATASTORE_EMULATOR_HOST'] = 'localhost:20000'
-os.environ['GOOGLE_CLOUD_PROJECT'] = 'google-cloud-datastore-odm-dev'
+load_dotenv()
 
 
 class ExampleModel(Model):
-    hey = StringField()
-    wow = IntegerField()
-    a = IntegerField()
+    name = StringField()
+    age = IntegerField()
+    score = IntegerField()
 
 
-a = ExampleModel(hey="str", wow=4, a=3)
+example = ExampleModel(name="str", age=4, score=3)
 
-print(a)
+print(f"Example model instance: {example}")
 
-stored = a.put()
-print(stored.key)
+stored_example = example.put()
+print(f"Stored example key: {stored_example.key}")
 
-b = ExampleModel.get(key=stored.key)
-print(b)
+retrieved_example = ExampleModel.get(key=stored_example.key)
+print(f"Retrieved example: {retrieved_example}")

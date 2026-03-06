@@ -13,6 +13,7 @@ dev = [
     "pytest>=9.0.2",
     "pytest-cov>=7.0.0",
     "pytest-env>=1.2.0",
+    "python-dotenv>=1.2.2",
     "ruff>=0.14.10",
 ]
 
@@ -21,7 +22,7 @@ testpaths = ["tests"]
 pythonpath = ["src"]
 env = [
     "GOOGLE_CLOUD_PROJECT=google-cloud-datastore-odm-test",
-    "DATASTORE_EMULATOR_HOST=localhost:20001"
+    "DATASTORE_EMULATOR_HOST=localhost:10001"
 ]
 log_format="%(asctime)s %(levelname)s %(message)s"
 log_level="INFO"

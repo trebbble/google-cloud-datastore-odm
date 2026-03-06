@@ -355,6 +355,7 @@ dev = [
     { name = "pytest" },
     { name = "pytest-cov" },
     { name = "pytest-env" },
+    { name = "python-dotenv" },
     { name = "ruff" },
 ]
 
@@ -366,6 +367,7 @@ dev = [
     { name = "pytest", specifier = ">=9.0.2" },
     { name = "pytest-cov", specifier = ">=7.0.0" },
     { name = "pytest-env", specifier = ">=1.2.0" },
+    { name = "python-dotenv", specifier = ">=1.2.2" },
     { name = "ruff", specifier = ">=0.14.10" },
 ]
 
