@@ -368,7 +368,7 @@ dev = [
     { name = "pytest-cov", specifier = ">=7.0.0" },
     { name = "pytest-env", specifier = ">=1.2.0" },
     { name = "python-dotenv", specifier = ">=1.2.2" },
-    { name = "ruff", specifier = ">=0.14.10" },
+    { name = "ruff", specifier = ">=0.15.5" },
 ]
 
 [[package]]
