@@ -1,6 +1,7 @@
 import pytest
-from src.google_cloud_datastore_odm.model import Model
+
 from src.google_cloud_datastore_odm.fields import StringField
+from src.google_cloud_datastore_odm.model import Model
 
 
 class KeyTestModel(Model):
@@ -74,4 +75,4 @@ def test_model_invalid_validator_not_callable():
         class InvalidValidator(Model):
             
             mock = Mock()
-            setattr(mock, '__model_validator__', True)
+            mock.__model_validator__ = True

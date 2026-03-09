@@ -1,9 +1,13 @@
-from .model import Model as Model
 from .fields import (
     Field as Field,
-    StringField as StringField,
+)
+from .fields import (
     IntegerField as IntegerField,
 )
+from .fields import (
+    StringField as StringField,
+)
+from .model import Model as Model
 
 __all__ = [
     "Model",

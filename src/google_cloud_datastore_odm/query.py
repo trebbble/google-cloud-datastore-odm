@@ -1,6 +1,8 @@
 from typing import TYPE_CHECKING, Any, Generator, Optional
-from .client import get_client
+
 from google.cloud.datastore.query import PropertyFilter
+
+from .client import get_client
 
 if TYPE_CHECKING:
     from .model import Model  # Only for static analysis

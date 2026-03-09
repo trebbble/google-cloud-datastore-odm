@@ -32,3 +32,14 @@ log_cli="true"
 log_cli_format="%(asctime)s %(levelname)s %(message)s"
 log_cli_date_format="%Y-%m-%d %H:%M:%S"
 addopts="-p no:warnings"
+
+[tool.ruff]
+line-length = 127
+target-version = "py38"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "C90"]
+ignore = []
+
+[tool.ruff.lint.mccabe]
+max-complexity = 20

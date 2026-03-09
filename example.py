@@ -1,5 +1,6 @@
-from src.google_cloud_datastore_odm import Model, StringField, IntegerField
 from dotenv import load_dotenv
+
+from src.google_cloud_datastore_odm import IntegerField, Model, StringField
 
 load_dotenv()
 

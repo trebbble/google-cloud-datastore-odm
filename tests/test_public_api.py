@@ -1,5 +1,5 @@
+from src.google_cloud_datastore_odm.fields import IntegerField, StringField
 from src.google_cloud_datastore_odm.model import Model
-from src.google_cloud_datastore_odm.fields import StringField, IntegerField
 
 
 class Article(Model):

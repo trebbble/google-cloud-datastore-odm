@@ -1,9 +1,9 @@
-from typing import ClassVar, Dict, List, Callable, Any, Optional
+from typing import Any, Callable, ClassVar, Dict, List, Optional
 
 from google.cloud import datastore
 
-from .fields import Field
 from .client import get_client
+from .fields import Field
 from .query import Query
 
 MODEL_VALIDATOR_ATTR = "__model_validator__"
