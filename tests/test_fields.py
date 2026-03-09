@@ -69,3 +69,57 @@ def test_integer_field_validation():
     assert instance.number_field == 1
     instance.number_field = 5
     assert instance.number_field == 5
+
+
+def test_field_invalid_validator():
+    with pytest.raises(TypeError, match="is not callable"):
+        StringField(validators=["not_a_function"])
+
+
+def test_field_type_enforcement():
+    class TypeTestModel(Model):
+        text = StringField()
+
+    instance = TypeTestModel()
+    
+    with pytest.raises(TypeError, match="must be str"):
+        instance.text = 123
+        
+    instance.text = "valid"
+    assert instance.text == "valid"
+
+
+def test_field_descriptor_delete():
+    class DeleteTestModel(Model):
+        text = StringField()
+
+    instance = DeleteTestModel(text="initial")
+    assert instance.text == "initial"
+    
+    del instance.text
+    assert instance.text is None
+
+
+def test_field_descriptor_get_on_class():
+    class ClassPropModel(Model):
+        text = StringField()
+
+    assert isinstance(ClassPropModel.text, StringField)
+
+
+def test_field_required_none_value():
+    class RequiredModel(Model):
+        text = StringField(required=True)
+        
+    instance = RequiredModel(text="valid")
+    
+    with pytest.raises(ValueError, match="is required"):
+        instance.text = None
+
+
+def test_field_optional_none_value():
+    class OptionalModel(Model):
+        text = StringField(required=False)
+        
+    instance = OptionalModel()
+    assert instance.text is None
