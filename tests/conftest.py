@@ -5,6 +5,8 @@ import logging
 from time import sleep
 
 from src.google_cloud_datastore_odm.client import get_client
+from src.google_cloud_datastore_odm.model import Model
+from src.google_cloud_datastore_odm.fields import StringField, IntegerField
 
 
 @pytest.fixture(autouse=True, scope="session")
@@ -42,11 +44,6 @@ def reset_datastore():
     response = requests.post(f"http://{os.environ.get('DATASTORE_EMULATOR_HOST')}/reset")
     assert response.status_code == 200
 
-
-# --- Shared Test Models ---
-
-from src.google_cloud_datastore_odm.model import Model
-from src.google_cloud_datastore_odm.fields import StringField, IntegerField
 
 class Constants:
     STRING_DEFAULT = 'default'

@@ -1,7 +1,6 @@
 import pytest
 from src.google_cloud_datastore_odm.model import Model
 from src.google_cloud_datastore_odm.fields import StringField
-from google.cloud import datastore
 
 
 class KeyTestModel(Model):
