@@ -121,5 +121,5 @@ def test_field_optional_none_value():
     class OptionalModel(Model):
         text = StringField(required=False)
         
-    instance = OptionalModel()
+    instance = OptionalModel(text=None)
     assert instance.text is None

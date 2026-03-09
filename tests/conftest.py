@@ -43,4 +43,38 @@ def reset_datastore():
     assert response.status_code == 200
 
 
+# --- Shared Test Models ---
 
+from src.google_cloud_datastore_odm.model import Model
+from src.google_cloud_datastore_odm.fields import StringField, IntegerField
+
+class Constants:
+    STRING_DEFAULT = 'default'
+    INTEGER_DEFAULT = 0
+    STRING_FIXTURE = 'test'
+    INTEGER_FIXTURE = 1
+
+
+class DummyTestModel(Model):
+    __kind__ = "DummyTestModel"
+    test_string_field = StringField(required=True, default=Constants.STRING_DEFAULT)
+    test_integer_field = IntegerField(required=True, default=Constants.INTEGER_DEFAULT)
+
+
+class QueryTestModel(Model):
+    __kind__ = "QueryTestModel"
+    name = StringField()
+    age = IntegerField()
+
+
+@pytest.fixture
+def sample_dummy_doc() -> DummyTestModel:
+    return DummyTestModel(
+        test_string_field=Constants.STRING_FIXTURE, 
+        test_integer_field=Constants.INTEGER_FIXTURE
+    )
+
+
+@pytest.fixture
+def query_model_instance() -> QueryTestModel:
+    return QueryTestModel(name="Bob", age=30)
