@@ -1,3 +1,7 @@
+# Google Cloud Datastore ODM
+
+[![CI](https://github.com/trebbble/google-cloud-datastore-odm/actions/workflows/ci.yml/badge.svg)](https://github.com/trebbble/google-cloud-datastore-odm/actions/workflows/ci.yml) ![Coverage](./coverage.svg)
+
 ### Dependencies
 - `uv sync all-groups`
 
