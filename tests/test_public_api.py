@@ -1,10 +1,10 @@
-from src.google_cloud_datastore_odm.fields import IntegerField, StringField
 from src.google_cloud_datastore_odm.model import Model
+from src.google_cloud_datastore_odm.properties import IntegerProperty, StringProperty
 
 
 class Article(Model):
-    title = StringField(required=True)
-    views = IntegerField(default=0)
+    title = StringProperty(required=True)
+    views = IntegerProperty(default=0)
 
 
 def test_public_api_usage(reset_datastore):

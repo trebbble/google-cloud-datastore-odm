@@ -20,7 +20,7 @@
 
 
 ### Local tests & Coverage:
-  - From root folder `docker compose -f docker-compose.yml up -d --build` datastore-test
+  - From root folder `docker compose -f docker-compose.yml up -d --build datastore-test`
   - `uv run pytest` or `python3.12 -m pytest` 
   - To run with coverage and generate an XML report: `uv run pytest --cov=src --cov-report=xml --cov-report=term-missing`
   - To generate the local coverage badge (requires the XML report): `uv run genbadge coverage -i coverage.xml -o coverage.svg`

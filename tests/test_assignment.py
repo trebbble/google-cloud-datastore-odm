@@ -1,7 +1,7 @@
 import pytest
 
-from src.google_cloud_datastore_odm.fields import StringField
 from src.google_cloud_datastore_odm.model import Model
+from src.google_cloud_datastore_odm.properties import StringProperty
 from tests.conftest import Constants
 
 
@@ -33,7 +33,7 @@ def test_iteration_and_items(sample_dummy_doc):
 
 def test_missing_required_field_raises():
     class Dummy(Model):
-        test_string_field = StringField(required=True)
+        test_string_field = StringProperty(required=True)
 
     with pytest.raises(ValueError):
         Dummy()

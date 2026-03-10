@@ -3,7 +3,7 @@ from typing import Any, Callable, ClassVar, Dict, List, Optional
 from google.cloud import datastore
 
 from .client import get_client
-from .fields import Field
+from .properties import Property
 from .query import Query
 
 MODEL_VALIDATOR_ATTR = "__model_validator__"
@@ -17,7 +17,7 @@ def model_validator(func: Callable) -> Callable:
     - Model.validate() is called explicitly
     - Model.put() is called
 
-    They are NOT executed during instantiation or field assignment.
+    They are NOT executed during instantiation or property assignment.
     """
     setattr(func, MODEL_VALIDATOR_ATTR, True)
     return func
@@ -26,7 +26,7 @@ def model_validator(func: Callable) -> Callable:
 class ModelMeta(type):
     """
     Metaclass responsible for collecting:
-    - Field definitions
+    - Property definitions
     - Model-level validators
     - Datastore kind metadata
 
@@ -34,18 +34,18 @@ class ModelMeta(type):
     """
 
     def __new__(mcs, class_name, base_classes, class_attrs):
-        collected_fields: Dict[str, Field] = {}
+        collected_properties: Dict[str, Property] = {}
         collected_validators: List[Callable] = []
 
-        # Inherit fields and model validators from base classes
+        # Inherit properties and model validators from base classes
         for base_class in base_classes:
-            collected_fields.update(getattr(base_class, "_fields", {}))
+            collected_properties.update(getattr(base_class, "_properties", {}))
             collected_validators.extend(getattr(base_class, "_model_validators", []))
 
-        # Collect fields and model-level validators
+        # Collect properties and model-level validators
         for attribute_name, attribute_value in class_attrs.items():
-            if isinstance(attribute_value, Field):
-                collected_fields[attribute_name] = attribute_value
+            if isinstance(attribute_value, Property):
+                collected_properties[attribute_name] = attribute_value
 
             if getattr(attribute_value, MODEL_VALIDATOR_ATTR, False):
                 if not callable(attribute_value):
@@ -60,7 +60,7 @@ class ModelMeta(type):
             raise TypeError("__kind__ must be a string")
 
         # Inject collected metadata into the class
-        class_attrs["_fields"] = collected_fields
+        class_attrs["_properties"] = collected_properties
         class_attrs["_model_validators"] = collected_validators
         class_attrs["_kind"] = datastore_kind
 
@@ -72,14 +72,14 @@ class Model(metaclass=ModelMeta):
     Base ODM model for Google Cloud Datastore.
 
     Responsibilities:
-    - Field validation and storage
+    - Property validation and storage
     - Model-level validation
     - Datastore persistence
     - Entity hydration
     """
 
     # --- metaclass-injected attributes (declared for type checkers) ---
-    _fields: ClassVar[Dict[str, Field]] = {}
+    _properties: ClassVar[Dict[str, Property]] = {}
     _model_validators: ClassVar[List[Callable]] = []
     _kind: ClassVar[str]
 
@@ -90,7 +90,7 @@ class Model(metaclass=ModelMeta):
         """
         Initialize a model instance.
 
-        Field values are validated on assignment.
+        Property values are validated on assignment.
         The datastore key may be optionally provided via `key=...`.
         """
         self._values: Dict[str, Any] = {}
@@ -98,21 +98,21 @@ class Model(metaclass=ModelMeta):
         # Extract datastore key if provided
         self.key = kwargs.pop("key", None)
 
-        # Populate fields, apply defaults and enforce required ones
-        for field_name, field in self._fields.items():
-            if field_name in kwargs:
-                setattr(self, field_name, kwargs[field_name])
-            elif field.default is not None:
-                setattr(self, field_name, field.default)
-            elif field.required:
-                raise ValueError(f"{field_name} is required")
+        # Populate properties, apply defaults and enforce required ones
+        for property_name, _property in self._properties.items():
+            if property_name in kwargs:
+                setattr(self, property_name, kwargs[property_name])
+            elif _property.default is not None:
+                setattr(self, property_name, _property.default)
+            elif _property.required:
+                raise ValueError(f"{property_name} is required")
 
     def __repr__(self) -> str:
-        field_repr = ", ".join(
+        property_repr = ", ".join(
             f"{name}={value!r}" for name, value in self._values.items()
         )
         key_part = f" id={self.id!r}" if self.key else ""
-        return f"<{self.__class__.__name__}{key_part} {field_repr}>"
+        return f"<{self.__class__.__name__}{key_part} {property_repr}>"
 
     def __getitem__(self, key: str) -> Any:
         return self._values[key]
@@ -128,7 +128,7 @@ class Model(metaclass=ModelMeta):
 
     def to_dict(self) -> Dict[str, Any]:
         """
-        Return a shallow dictionary representation of the model fields.
+        Return a shallow dictionary representation of the model properties.
         """
         return dict(self._values)
 
@@ -136,7 +136,7 @@ class Model(metaclass=ModelMeta):
         """
         Execute all model-level validators.
 
-        Field-level validation has already occurred during assignment.
+        Property-level validation has already occurred during assignment.
         """
         for validator in self._model_validators:
             validator(self)
@@ -212,10 +212,10 @@ class Model(metaclass=ModelMeta):
         client = self._client()
         entity = datastore.Entity(key=self.key)
 
-        for field_name in self._fields:
-            value = self._values.get(field_name)
+        for property_name in self._properties:
+            value = self._values.get(property_name)
             if value is not None:
-                entity[field_name] = value
+                entity[property_name] = value
 
         client.put(entity)
         self.key = entity.key

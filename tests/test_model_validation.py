@@ -1,12 +1,12 @@
 import pytest
 
-from src.google_cloud_datastore_odm.fields import IntegerField, StringField
 from src.google_cloud_datastore_odm.model import Model, model_validator
+from src.google_cloud_datastore_odm.properties import IntegerProperty, StringProperty
 
 
 class UserWithValidator(Model):
-    name_field = StringField()
-    age_field = IntegerField()
+    name_field = StringProperty()
+    age_field = IntegerProperty()
 
     @model_validator
     def validate_age_nonnegative(self):
@@ -25,8 +25,8 @@ def test_model_validator_explicit():
 
 def test_multiple_model_validators():
     class Product(Model):
-        price_field = IntegerField()
-        stock_field = IntegerField()
+        price_field = IntegerProperty()
+        stock_field = IntegerProperty()
 
         @model_validator
         def validate_price(self):

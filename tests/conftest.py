@@ -6,8 +6,8 @@ import pytest
 import requests
 
 from src.google_cloud_datastore_odm.client import get_client
-from src.google_cloud_datastore_odm.fields import IntegerField, StringField
 from src.google_cloud_datastore_odm.model import Model
+from src.google_cloud_datastore_odm.properties import IntegerProperty, StringProperty
 
 
 @pytest.fixture(autouse=True, scope="session")
@@ -55,14 +55,14 @@ class Constants:
 
 class DummyTestModel(Model):
     __kind__ = "DummyTestModel"
-    test_string_field = StringField(required=True, default=Constants.STRING_DEFAULT)
-    test_integer_field = IntegerField(required=True, default=Constants.INTEGER_DEFAULT)
+    test_string_field = StringProperty(required=True, default=Constants.STRING_DEFAULT)
+    test_integer_field = IntegerProperty(required=True, default=Constants.INTEGER_DEFAULT)
 
 
 class QueryTestModel(Model):
     __kind__ = "QueryTestModel"
-    name = StringField()
-    age = IntegerField()
+    name = StringProperty()
+    age = IntegerProperty()
 
 
 @pytest.fixture

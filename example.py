@@ -8,7 +8,7 @@ To run this locally, you need:
 
 from dotenv import load_dotenv
 
-from src.google_cloud_datastore_odm import IntegerField, Model, StringField
+from src.google_cloud_datastore_odm import IntegerProperty, Model, StringProperty
 from src.google_cloud_datastore_odm.model import model_validator
 
 load_dotenv()
@@ -17,7 +17,7 @@ load_dotenv()
 # ---------------------------------------------------------------------------
 # 1. Model Definition
 #    - Use __kind__ to customize the Datastore kind (defaults to class name).
-#    - Fields are class-level descriptors.
+#    - Properties are class-level descriptors.
 #    - Use required=True to enforce presence, default= for fallback values.
 #    - choices= to restrict to a set of values, min_length/max_length for strings,
 #      min_value/max_value for integers.
@@ -26,16 +26,16 @@ load_dotenv()
 class Article(Model):
     __kind__ = "Article"
 
-    title = StringField(required=True, min_length=3, max_length=200)
-    author = StringField(required=True)
-    status = StringField(default="draft", choices=["draft", "published", "archived"])
-    word_count = IntegerField(default=0, min_value=0)
-    rating = IntegerField(choices=[1, 2, 3, 4, 5])
+    title = StringProperty(required=True, min_length=3, max_length=200)
+    author = StringProperty(required=True)
+    status = StringProperty(default="draft", choices=["draft", "published", "archived"])
+    word_count = IntegerProperty(default=0, min_value=0)
+    rating = IntegerProperty(choices=[1, 2, 3, 4, 5])
 
     # -----------------------------------------------------------------------
     # 2. Model-level validators
     #    - Decorated with @model_validator, run when .validate() or .put() is called.
-    #    - Receive the model instance for cross-field logic.
+    #    - Receive the model instance for cross-property logic.
     # -----------------------------------------------------------------------
     @model_validator
     def validate_published_requires_content(self):
@@ -44,8 +44,8 @@ class Article(Model):
 
 
 # ---------------------------------------------------------------------------
-# 3. Custom field validators
-#    - Passed as a list to Field(validators=[...])
+# 3. Custom property validators
+#    - Passed as a list to Property(validators=[...])
 #    - Receive and return the value, or raise ValueError.
 # ---------------------------------------------------------------------------
 
@@ -59,8 +59,8 @@ def no_emoji_allowed(value: str) -> str:
 class Comment(Model):
     __kind__ = "Comment"
 
-    body = StringField(required=True, validators=[no_emoji_allowed])
-    score = IntegerField(default=0)
+    body = StringProperty(required=True, validators=[no_emoji_allowed])
+    score = IntegerProperty(default=0)
 
 
 # ---------------------------------------------------------------------------
@@ -128,7 +128,7 @@ print(f"Fetched by ID: {fetched_by_id}")
 
 # ---------------------------------------------------------------------------
 # 9. Query passthrough (.query().filter().fetch())
-#    - Filters are raw Datastore-style: (field_name, operator, value)
+#    - Filters are raw Datastore-style: (property_name, operator, value)
 #    - Results are hydrated as model instances.
 #    - Use limit= in .fetch() to page results.
 # ---------------------------------------------------------------------------
@@ -178,7 +178,7 @@ print(f"After put key: {draft.key}, ID: {draft.id}")
 print("\n--- Introspection ---")
 print(f"Article kind: {Article.kind()}")
 print(f"Comment kind: {Comment.kind()}")
-print(f"Article fields: {list(Article._fields.keys())}")
+print(f"Article properties: {list(Article._properties.keys())}")
 
 
 # ---------------------------------------------------------------------------
@@ -189,7 +189,7 @@ print("\n--- Validation Examples ---")
 try:
     bad = Article(title="X", author="Dave")  # too short: min_length=3
 except ValueError as e:
-    print(f"Caught field validation error: {e}")
+    print(f"Caught property validation error: {e}")
 
 try:
     bad_comment = Comment(body="Love it! 😊")  # triggers custom validator

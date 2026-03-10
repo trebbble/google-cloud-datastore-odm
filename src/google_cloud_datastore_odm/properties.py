@@ -4,14 +4,14 @@ if TYPE_CHECKING:
     from .model import Model  # Only for static analysis, avoids circular import
 
 
-class Field:
+class Property:
     """
-    Base descriptor for model fields.
+    Base descriptor for model properties.
 
     Responsibilities:
     - Required checks
     - Python type enforcement
-    - Field-level validators
+    - Property-level validators
     """
 
     python_type: Optional[type] = None
@@ -30,7 +30,7 @@ class Field:
         # Ensure all validators are callable
         for validator in self.validators:
             if not callable(validator):
-                raise TypeError(f"Validator {validator} for field '{self}' is not callable")
+                raise TypeError(f"Validator {validator} for property '{self}' is not callable")
 
     def __set_name__(self, owner, name: str):
         """Called by Python to set the attribute name on the owner class."""
@@ -38,22 +38,22 @@ class Field:
 
     def validate(self, value: Any) -> Any:
         """
-        Validate and process a value for this field.
+        Validate and process a value for this property.
 
         Steps:
         1. Check required
         2. Enforce type
-        3. Apply field-level validators
+        3. Apply property-level validators
         """
         if value is None:
             if self.required:
-                raise ValueError(f"Field '{self.name}' is required")
+                raise ValueError(f"Property '{self.name}' is required")
             return None
 
         if self.python_type and not isinstance(value, self.python_type):
-            raise TypeError(f"Field '{self.name}' must be {self.python_type.__name__}")
+            raise TypeError(f"Property '{self.name}' must be {self.python_type.__name__}")
 
-        # Field-level validators
+        # Property-level validators
         for validator in self.validators:
             value = validator(value)
 
@@ -78,7 +78,7 @@ class Field:
         instance._values.pop(self.name, None)
 
 
-class StringField(Field):
+class StringProperty(Property):
     python_type = str
 
     def __init__(
@@ -117,7 +117,7 @@ class StringField(Field):
         return value
 
 
-class IntegerField(Field):
+class IntegerProperty(Property):
     python_type = int
 
     def __init__(

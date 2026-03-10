@@ -1,17 +1,17 @@
-from .fields import (
-    Field as Field,
-)
-from .fields import (
-    IntegerField as IntegerField,
-)
-from .fields import (
-    StringField as StringField,
-)
 from .model import Model as Model
+from .properties import (
+    IntegerProperty as IntegerProperty,
+)
+from .properties import (
+    Property as Property,
+)
+from .properties import (
+    StringProperty as StringProperty,
+)
 
 __all__ = [
     "Model",
-    "Field",
-    "StringField",
-    "IntegerField",
+    "Property",
+    "StringProperty",
+    "IntegerProperty",
 ]

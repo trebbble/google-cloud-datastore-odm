@@ -1,7 +1,7 @@
 import pytest
 
-from src.google_cloud_datastore_odm.fields import IntegerField, StringField
 from src.google_cloud_datastore_odm.model import Model
+from src.google_cloud_datastore_odm.properties import IntegerProperty, StringProperty
 
 
 def reject_trigger_value(value):
@@ -11,17 +11,17 @@ def reject_trigger_value(value):
 
 
 class DemoModel(Model):
-    text_field = StringField(
+    text_field = StringProperty(
         min_length=2,
         max_length=5,
         choices=["hi", "hey"],
     )
-    number_field = IntegerField(
+    number_field = IntegerProperty(
         min_value=1,
         max_value=10,
         choices=[1, 5, 10],
     )
-    custom_validated = StringField(validators=[reject_trigger_value])
+    custom_validated = StringProperty(validators=[reject_trigger_value])
 
 
 def test_string_field_validation():
@@ -74,12 +74,12 @@ def test_integer_field_validation():
 
 def test_field_invalid_validator():
     with pytest.raises(TypeError, match="is not callable"):
-        StringField(validators=["not_a_function"])
+        StringProperty(validators=["not_a_function"])
 
 
 def test_field_type_enforcement():
     class TypeTestModel(Model):
-        text = StringField()
+        text = StringProperty()
 
     instance = TypeTestModel()
     
@@ -92,7 +92,7 @@ def test_field_type_enforcement():
 
 def test_field_descriptor_delete():
     class DeleteTestModel(Model):
-        text = StringField()
+        text = StringProperty()
 
     instance = DeleteTestModel(text="initial")
     assert instance.text == "initial"
@@ -103,14 +103,14 @@ def test_field_descriptor_delete():
 
 def test_field_descriptor_get_on_class():
     class ClassPropModel(Model):
-        text = StringField()
+        text = StringProperty()
 
-    assert isinstance(ClassPropModel.text, StringField)
+    assert isinstance(ClassPropModel.text, StringProperty)
 
 
 def test_field_required_none_value():
     class RequiredModel(Model):
-        text = StringField(required=True)
+        text = StringProperty(required=True)
         
     instance = RequiredModel(text="valid")
     
@@ -120,7 +120,7 @@ def test_field_required_none_value():
 
 def test_field_optional_none_value():
     class OptionalModel(Model):
-        text = StringField(required=False)
+        text = StringProperty(required=False)
         
     instance = OptionalModel(text=None)
     assert instance.text is None

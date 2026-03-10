@@ -1,11 +1,11 @@
 import pytest
 
-from src.google_cloud_datastore_odm.fields import StringField
 from src.google_cloud_datastore_odm.model import Model
+from src.google_cloud_datastore_odm.properties import StringProperty
 
 
 class KeyTestModel(Model):
-    name = StringField()
+    name = StringProperty()
 
 
 def test_model_invalid_kind():
