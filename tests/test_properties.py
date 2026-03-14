@@ -1,7 +1,7 @@
 import pytest
 
 from src.google_cloud_datastore_odm.model import Model, field_validator
-from src.google_cloud_datastore_odm.properties import Property, IntegerProperty, StringProperty
+from src.google_cloud_datastore_odm.properties import IntegerProperty, Property, StringProperty
 
 
 def reject_trigger_value(value):
