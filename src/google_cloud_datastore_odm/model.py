@@ -1,3 +1,4 @@
+from collections import defaultdict
 from typing import Any, Callable, ClassVar, Dict, List, Optional
 
 from google.cloud import datastore
@@ -7,6 +8,7 @@ from .properties import Property
 from .query import Query
 
 MODEL_VALIDATOR_ATTR = "__model_validator__"
+FIELD_VALIDATOR_ATTR = "__field_validator__"
 
 
 def model_validator(func: Callable) -> Callable:
@@ -23,11 +25,24 @@ def model_validator(func: Callable) -> Callable:
     return func
 
 
+def field_validator(field: str) -> Callable:
+    """
+    Decorator used to mark a method as a field validator.
+    """
+
+    def decorator(func: Callable) -> Callable:
+        setattr(func, FIELD_VALIDATOR_ATTR, field)
+        return func
+
+    return decorator
+
+
 class ModelMeta(type):
     """
     Metaclass responsible for collecting:
     - Property definitions
     - Model-level validators
+    - Field-level validators
     - Datastore kind metadata
 
     This runs once per model class at class creation time.
@@ -36,13 +51,18 @@ class ModelMeta(type):
     def __new__(mcs, class_name, base_classes, class_attrs):
         collected_properties: Dict[str, Property] = {}
         collected_validators: List[Callable] = []
+        collected_field_validators: Dict[str, List[str]] = defaultdict(list)
 
-        # Inherit properties and model validators from base classes
+        # Inherit properties and validators from base classes
         for base_class in base_classes:
             collected_properties.update(getattr(base_class, "_properties", {}))
             collected_validators.extend(getattr(base_class, "_model_validators", []))
 
-        # Collect properties and model-level validators
+            # Inherit field validators
+            for field, methods in getattr(base_class, "_field_validators", {}).items():
+                collected_field_validators[field].extend(methods)
+
+        # Collect properties and validators
         for attribute_name, attribute_value in class_attrs.items():
             if isinstance(attribute_value, Property):
                 collected_properties[attribute_name] = attribute_value
@@ -54,6 +74,15 @@ class ModelMeta(type):
                     )
                 collected_validators.append(attribute_value)
 
+            # Collect field validators
+            field_name = getattr(attribute_value, FIELD_VALIDATOR_ATTR, None)
+            if field_name:
+                if not callable(attribute_value):
+                    raise TypeError(
+                        f"Field validator '{attribute_name}' on class '{class_name}' is not callable"
+                    )
+                collected_field_validators[field_name].append(attribute_name)
+
         # Resolve datastore kind
         datastore_kind = class_attrs.get("__kind__", class_name)
         if not isinstance(datastore_kind, str):
@@ -62,6 +91,7 @@ class ModelMeta(type):
         # Inject collected metadata into the class
         class_attrs["_properties"] = collected_properties
         class_attrs["_model_validators"] = collected_validators
+        class_attrs["_field_validators"] = dict(collected_field_validators)
         class_attrs["_kind"] = datastore_kind
 
         return super().__new__(mcs, class_name, base_classes, class_attrs)
@@ -81,6 +111,7 @@ class Model(metaclass=ModelMeta):
     # --- metaclass-injected attributes (declared for type checkers) ---
     _properties: ClassVar[Dict[str, Property]] = {}
     _model_validators: ClassVar[List[Callable]] = []
+    _field_validators: ClassVar[Dict[str, List[str]]] = {}
     _kind: ClassVar[str]
 
     # Datastore entity key (identity)
@@ -176,9 +207,9 @@ class Model(metaclass=ModelMeta):
 
     @classmethod
     def key_from_id(
-        cls,
-        identifier: Any,
-        parent: Optional[datastore.Key] = None,
+            cls,
+            identifier: Any,
+            parent: Optional[datastore.Key] = None,
     ) -> datastore.Key:
         """Construct a datastore Key for this model's kind."""
         return cls._client().key(cls._kind, identifier, parent=parent)

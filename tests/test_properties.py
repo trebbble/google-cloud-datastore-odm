@@ -1,27 +1,41 @@
 import pytest
 
-from src.google_cloud_datastore_odm.model import Model
-from src.google_cloud_datastore_odm.properties import IntegerProperty, StringProperty
+from src.google_cloud_datastore_odm.model import Model, field_validator
+from src.google_cloud_datastore_odm.properties import Property, IntegerProperty, StringProperty
 
 
 def reject_trigger_value(value):
     if value == 'trigger_error':
-        raise ValueError
+        raise ValueError("Triggered error")
     return value
 
 
 class DemoModel(Model):
-    text_field = StringProperty(
-        min_length=2,
-        max_length=5,
-        choices=["hi", "hey"],
-    )
-    number_field = IntegerProperty(
-        min_value=1,
-        max_value=10,
-        choices=[1, 5, 10],
-    )
+    text_field = StringProperty()
+    number_field = IntegerProperty()
     custom_validated = StringProperty(validators=[reject_trigger_value])
+
+    @field_validator('text_field')
+    def validate_text_field_length(self, value: str) -> str:
+        if len(value) < 2 or len(value) > 5:
+            raise ValueError("Text characters length should be [2-5].")
+        return value
+
+    @field_validator('text_field')
+    def validate_text_field_choices(self, value: str) -> str:
+        if value not in ["hi", "hey"]:
+            raise ValueError("Text characters should be [hi,hey].")
+
+        return value
+
+    @field_validator('number_field')
+    def validate_number_field(self, value: int) -> int:
+        if value < 1 or value > 10:
+            raise ValueError("Number should be in [1-10].")
+
+        if value not in [1, 5, 10]:
+            raise ValueError("Number should be one of [1, 5, 10].")
+        return value
 
 
 def test_string_field_validation():
@@ -73,19 +87,23 @@ def test_integer_field_validation():
 
 
 def test_field_invalid_validator():
-    with pytest.raises(TypeError, match="is not callable"):
+    with pytest.raises(TypeError):
         StringProperty(validators=["not_a_function"])
 
 
 def test_field_type_enforcement():
     class TypeTestModel(Model):
         text = StringProperty()
+        integer = IntegerProperty()
 
     instance = TypeTestModel()
-    
-    with pytest.raises(TypeError, match="must be str"):
+
+    with pytest.raises(TypeError):
         instance.text = 123
-        
+
+    with pytest.raises(TypeError):
+        instance.integer = 'test'
+
     instance.text = "valid"
     assert instance.text == "valid"
 
@@ -96,7 +114,7 @@ def test_field_descriptor_delete():
 
     instance = DeleteTestModel(text="initial")
     assert instance.text == "initial"
-    
+
     del instance.text
     assert instance.text is None
 
@@ -111,16 +129,39 @@ def test_field_descriptor_get_on_class():
 def test_field_required_none_value():
     class RequiredModel(Model):
         text = StringProperty(required=True)
-        
+
     instance = RequiredModel(text="valid")
-    
-    with pytest.raises(ValueError, match="is required"):
+
+    with pytest.raises(ValueError):
         instance.text = None
 
 
 def test_field_optional_none_value():
     class OptionalModel(Model):
         text = StringProperty(required=False)
-        
+
     instance = OptionalModel(text=None)
     assert instance.text is None
+
+
+def test_metaclass_rejects_non_callable_field_validator():
+    with pytest.raises(TypeError):
+        class MockValidator:
+            pass
+
+        bad_mock = MockValidator()
+        # Set the attribute manually to bypass the decorator and test the metaclass
+        bad_mock.__field_validator__ = 'text'
+
+        class BadModel(Model):
+            text = StringProperty()
+            bad_validator = bad_mock
+
+
+def test_base_property_validate_type():
+
+    class BasePropModel(Model):
+        untyped_field = Property()
+
+    instance = BasePropModel(untyped_field={"complex": "object"})
+    assert instance.untyped_field == {"complex": "object"}

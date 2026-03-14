@@ -10,7 +10,7 @@ class UserWithValidator(Model):
 
     @model_validator
     def validate_age_nonnegative(self):
-        if self.age_field < 0:
+        if self.age_field is not None and self.age_field < 0:
             raise ValueError("Age cannot be negative")
 
 
@@ -30,12 +30,12 @@ def test_multiple_model_validators():
 
         @model_validator
         def validate_price(self):
-            if self.price_field < 0:
+            if self.price_field is not None and self.price_field < 0:
                 raise ValueError("Price must be non-negative")
 
         @model_validator
         def validate_stock(self):
-            if self.stock_field < 0:
+            if self.stock_field is not None and self.stock_field < 0:
                 raise ValueError("Stock must be non-negative")
 
     product = Product(price_field=10, stock_field=5)

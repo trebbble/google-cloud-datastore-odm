@@ -9,7 +9,7 @@ To run this locally, you need:
 from dotenv import load_dotenv
 
 from src.google_cloud_datastore_odm import IntegerProperty, Model, StringProperty
-from src.google_cloud_datastore_odm.model import model_validator
+from src.google_cloud_datastore_odm.model import field_validator, model_validator
 
 load_dotenv()
 
@@ -17,26 +17,58 @@ load_dotenv()
 # ---------------------------------------------------------------------------
 # 1. Model Definition
 #    - Use __kind__ to customize the Datastore kind (defaults to class name).
-#    - Properties are class-level descriptors.
+#    - Properties enforce Python types and required states.
 #    - Use required=True to enforce presence, default= for fallback values.
-#    - choices= to restrict to a set of values, min_length/max_length for strings,
-#      min_value/max_value for integers.
 # ---------------------------------------------------------------------------
 
 class Article(Model):
     __kind__ = "Article"
 
-    title = StringProperty(required=True, min_length=3, max_length=200)
+    title = StringProperty(required=True)
     author = StringProperty(required=True)
-    status = StringProperty(default="draft", choices=["draft", "published", "archived"])
-    word_count = IntegerProperty(default=0, min_value=0)
-    rating = IntegerProperty(choices=[1, 2, 3, 4, 5])
+    status = StringProperty(default="draft")
+    word_count = IntegerProperty(default=0)
+    rating = IntegerProperty()
 
     # -----------------------------------------------------------------------
-    # 2. Model-level validators
-    #    - Decorated with @model_validator, run when .validate() or .put() is called.
-    #    - Receive the model instance for cross-property logic.
+    # 2. Field-level validators
+    #    - Decorated with @field_validator('property_name').
+    #    - Run automatically during property assignment.
+    #    - Useful for length checks, choices, and numeric bounds.
     # -----------------------------------------------------------------------
+
+    @field_validator('title')
+    def validate_title(self, value: str) -> str:
+        if len(value) < 3 or len(value) > 200:
+            raise ValueError("Title must be between 3 and 200 characters.")
+        return value
+
+    @field_validator('status')
+    def validate_status(self, value: str) -> str:
+        valid_statuses = ["draft", "published", "archived"]
+        if value not in valid_statuses:
+            raise ValueError(f"Status must be one of {valid_statuses}")
+        return value
+
+    @field_validator('word_count')
+    def validate_word_count(self, value: int) -> int:
+        if value < 0:
+            raise ValueError("Word count cannot be negative.")
+        return value
+
+    @field_validator('rating')
+    def validate_rating(self, value: int) -> int:
+        if value not in [1, 2, 3, 4, 5]:
+            raise ValueError("Rating must be an integer between 1 and 5.")
+        return value
+
+    # -----------------------------------------------------------------------
+    # 3. Model-level validators
+    #    - Decorated with @model_validator.
+    #    - Run when .validate() or .put() is called.
+    #    - Used for cross-property logic (e.g., status depends on word_count).
+    # -----------------------------------------------------------------------
+
     @model_validator
     def validate_published_requires_content(self):
         if self.status == "published" and (self.word_count or 0) == 0:
@@ -44,9 +76,9 @@ class Article(Model):
 
 
 # ---------------------------------------------------------------------------
-# 3. Custom property validators
-#    - Passed as a list to Property(validators=[...])
-#    - Receive and return the value, or raise ValueError.
+# 4. Custom property validators (Inline)
+#    - Passed as a list to Property(validators=[...]).
+#    - Run *before* the @field_validators.
 # ---------------------------------------------------------------------------
 
 def no_emoji_allowed(value: str) -> str:
@@ -64,7 +96,7 @@ class Comment(Model):
 
 
 # ---------------------------------------------------------------------------
-# 4. Instance creation
+# 5. Instance creation
 # ---------------------------------------------------------------------------
 
 print("--- Instance Creation ---")
@@ -78,7 +110,7 @@ print(f"Created comment: {comment}")
 
 
 # ---------------------------------------------------------------------------
-# 5. Dictionary-style access and iteration
+# 6. Dictionary-style access and iteration
 # ---------------------------------------------------------------------------
 
 print("\n--- Dict-style and Iteration ---")
@@ -93,7 +125,7 @@ print("to_dict():", article.to_dict())
 
 
 # ---------------------------------------------------------------------------
-# 6. Persisting to Datastore (.put)
+# 7. Persisting to Datastore (.put)
 #    - Runs model-level validators before writing.
 #    - Assigns & returns a Datastore key on the instance.
 # ---------------------------------------------------------------------------
@@ -106,7 +138,7 @@ print(f"ID: {saved_article.id}")
 
 
 # ---------------------------------------------------------------------------
-# 7. Fetching by key (.get)
+# 8. Fetching by key (.get)
 # ---------------------------------------------------------------------------
 
 print("\n--- Fetching by Key ---")
@@ -116,7 +148,7 @@ print(f"Fetched ID: {fetched.id}")
 
 
 # ---------------------------------------------------------------------------
-# 8. Fetching by numeric/string ID (.get_by_id, .key_from_id)
+# 9. Fetching by numeric/string ID (.get_by_id, .key_from_id)
 # ---------------------------------------------------------------------------
 
 print("\n--- Get by ID ---")
@@ -127,24 +159,18 @@ print(f"Fetched by ID: {fetched_by_id}")
 
 
 # ---------------------------------------------------------------------------
-# 9. Query passthrough (.query().filter().fetch())
-#    - Filters are raw Datastore-style: (property_name, operator, value)
-#    - Results are hydrated as model instances.
-#    - Use limit= in .fetch() to page results.
+# 10. Query passthrough (.query().filter().fetch())
 # ---------------------------------------------------------------------------
 
 print("\n--- Queries ---")
-# Create a few more articles to query against
 Article(title="Tutorial: Python ODM", author="Bob", status="published", word_count=1200).put()
 Article(title="Advanced Queries", author="Alice", status="published", word_count=800).put()
 
-# Single filter
 results = list(Article.query().filter("author", "=", "Alice").fetch())
 print(f"Alice's articles: {len(results)} found")
 for r in results:
     print(f"  - {r.title} (status={r.status})")
 
-# Multiple filters
 results = list(
     Article.query()
     .filter("author", "=", "Alice")
@@ -153,14 +179,12 @@ results = list(
 )
 print(f"Alice's published articles: {len(results)} found")
 
-# Limit
 results = list(Article.query().fetch(limit=2))
 print(f"First 2 articles (limited): {len(results)} returned")
 
 
 # ---------------------------------------------------------------------------
-# 10. Explicit key allocation (.allocate_key)
-#     - Useful when you need the key before persisting.
+# 11. Explicit key allocation (.allocate_key)
 # ---------------------------------------------------------------------------
 
 print("\n--- Key Allocation ---")
@@ -172,7 +196,7 @@ print(f"After put key: {draft.key}, ID: {draft.id}")
 
 
 # ---------------------------------------------------------------------------
-# 11. Model kind introspection
+# 12. Model kind introspection
 # ---------------------------------------------------------------------------
 
 print("\n--- Introspection ---")
@@ -182,19 +206,19 @@ print(f"Article properties: {list(Article._properties.keys())}")
 
 
 # ---------------------------------------------------------------------------
-# 12. Validation errors
+# 13. Validation errors
 # ---------------------------------------------------------------------------
 
 print("\n--- Validation Examples ---")
 try:
-    bad = Article(title="X", author="Dave")  # too short: min_length=3
+    bad = Article(title="X", author="Dave")  # triggers validate_title field_validator
 except ValueError as e:
-    print(f"Caught property validation error: {e}")
+    print(f"Caught field validation error: {e}")
 
 try:
-    bad_comment = Comment(body="Love it! 😊")  # triggers custom validator
+    bad_comment = Comment(body="Love it! 😊")  # triggers inline validator
 except ValueError as e:
-    print(f"Caught custom validator error: {e}")
+    print(f"Caught inline validator error: {e}")
 
 try:
     unpublishable = Article(title="No Content", author="Eve", status="published", word_count=0)
