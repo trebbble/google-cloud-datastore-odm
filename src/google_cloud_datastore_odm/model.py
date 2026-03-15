@@ -59,7 +59,6 @@ class ModelMeta(type):
             collected_properties.update(getattr(base_class, "_properties", {}))
             collected_validators.extend(getattr(base_class, "_model_validators", []))
 
-            # Inherit field validators
             for field, methods in getattr(base_class, "_field_validators", {}).items():
                 collected_field_validators[field].extend(methods)
 
@@ -75,7 +74,6 @@ class ModelMeta(type):
                     )
                 collected_validators.append(attribute_value)
 
-            # Collect field validators
             field_name = getattr(attribute_value, FIELD_VALIDATOR_ATTR, None)
             if field_name:
                 if not callable(attribute_value):
@@ -84,12 +82,10 @@ class ModelMeta(type):
                     )
                 collected_field_validators[field_name].append(attribute_name)
 
-        # Resolve datastore kind
         datastore_kind = class_attrs.get("__kind__", class_name)
         if not isinstance(datastore_kind, str):
             raise TypeError("__kind__ must be a string")
 
-        # Inject collected metadata into the class
         class_attrs["_properties"] = collected_properties
         class_attrs["_model_validators"] = collected_validators
         class_attrs["_field_validators"] = dict(collected_field_validators)
@@ -108,7 +104,6 @@ class Model(metaclass=ModelMeta):
     - Datastore persistence
     - Entity hydration
     """
-    # --- metaclass-injected attributes (declared for type checkers) ---
     _properties: ClassVar[Dict[str, Property]] = {}
     _model_validators: ClassVar[List[Callable]] = []
     _field_validators: ClassVar[Dict[str, List[str]]] = {}
@@ -122,34 +117,29 @@ class Model(metaclass=ModelMeta):
         """
         self._values: Dict[str, Any] = {}
 
-        # 1. Key generation (Support for NDB-style id=...)
         _id = kwargs.pop("id", None)
         parent = kwargs.pop("parent", None)
 
         if _id:
-            self.key = self.key_from_id(_id, parent=parent) # 130
+            self.key = self.key_from_id(_id, parent=parent)
         else:
             self.key = kwargs.pop("key", None)
 
-        # 2. Populate properties
         for property_name, _property in self._properties.items():
             if property_name in kwargs:
                 setattr(self, property_name, kwargs.pop(property_name))
             elif _property.default is not None:
-                # 1. If the default is a callable (like `list` or `datetime.utcnow`), call it!
                 if callable(_property.default):
-                    default_val = _property.default() # 141
+                    default_val = _property.default()
                 else:
-                    # 2. Otherwise, safely deepcopy to prevent shared references in lists/dicts
                     try:
                         default_val = copy.deepcopy(_property.default)
                     except TypeError:
-                        default_val = _property.default  # Fallback
+                        default_val = _property.default
                 setattr(self, property_name, default_val)
             elif _property.required:
                 raise ValueError(f"{property_name} is required")
 
-        # Optional: Raise error on unknown properties for strict schemas
         if kwargs:
             raise AttributeError(f"Unknown properties provided to {self.__class__.__name__}: {list(kwargs.keys())}")
 
@@ -203,6 +193,61 @@ class Model(metaclass=ModelMeta):
     def kind(cls) -> str:
         return cls._kind
 
+    @classmethod
+    def get_schema(cls, output_format: str = "full") -> Any:
+        """
+        Public API for model introspection.
+
+        Args:
+            output_format:
+                - "full" (default): Returns Dict[str, dict] with JSON-serializable configurations.
+                - "properties": Returns List[Property] instances.
+                - "named_properties": Returns Dict[str, Property] instances.
+                - "property_names": Returns List[str] of Python property names.
+                - "property_aliases": Returns Dict[str, str] mapping Python names to Datastore names.
+        """
+        valid_formats = (
+            "properties",
+            "named_properties",
+            "property_names",
+            "property_aliases",
+            "full"
+        )
+
+        if output_format == "properties":
+            return list(cls._properties.values())
+
+        elif output_format == "property_names":
+            return list(cls._properties.keys())
+
+        elif output_format == "named_properties":
+            return cls._properties
+
+        elif output_format == "property_aliases":
+            return {
+                py_name: prop.datastore_name
+                for py_name, prop in cls._properties.items()
+            }
+
+        elif output_format == "full":
+            schema = {}
+            for py_name, prop in cls._properties.items():
+                schema[py_name] = {
+                    "type": prop.__class__.__name__,
+                    "datastore_name": prop.datastore_name,
+                    "required": prop.required,
+                    "repeated": prop.repeated,
+                    "indexed": prop.indexed,
+                    "choices": prop.choices,
+                    "default": prop.default if not callable(prop.default) else f"<callable: {prop.default.__name__}>"
+                }
+            return schema
+
+        else:
+            raise ValueError(
+                f"Unknown output format '{output_format}'. Must be one of {valid_formats}"
+            )
+
     def allocate_key(self, parent: Optional[datastore.Key] = None) -> datastore.Key:
         """
         Explicitly allocate a datastore key for this model instance.
@@ -253,9 +298,8 @@ class Model(metaclass=ModelMeta):
         self._ensure_key()
         client = self._client()
 
-        # Gather unindexed properties
         unindexed_names = [
-            prop._datastore_name for prop in self._properties.values() if not prop.indexed
+            prop.datastore_name for prop in self._properties.values() if not prop.indexed
         ]
 
         entity = datastore.Entity(
@@ -266,9 +310,8 @@ class Model(metaclass=ModelMeta):
         for py_name, prop in self._properties.items():
             value = self._values.get(py_name)
 
-            # Write to Datastore using the datastore_name
             if value is not None:
-                entity[prop._datastore_name] = value
+                entity[prop.datastore_name] = value
 
         client.put(entity)
         self.key = entity.key
@@ -282,10 +325,9 @@ class Model(metaclass=ModelMeta):
 
         kwargs = {}
 
-        # Read from Datastore using the datastore_name, but instantiate using the python_name
         for py_name, prop in cls._properties.items():
-            if prop._datastore_name in entity:
-                kwargs[py_name] = entity[prop._datastore_name]
+            if prop.datastore_name in entity:
+                kwargs[py_name] = entity[prop.datastore_name]
 
         instance = cls(key=entity.key, **kwargs)
         return instance

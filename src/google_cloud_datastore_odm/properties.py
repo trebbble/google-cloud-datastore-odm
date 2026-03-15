@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING, Any, Callable, List, Optional
 
 if TYPE_CHECKING:
-    from .model import Model  # Only for static analysis, avoids circular import
+    from .model import Model
 
 
 class Property:
@@ -30,20 +30,18 @@ class Property:
             choices: Optional[list] = None,
             validators: Optional[List[Callable]] = None,
     ):
-        self._datastore_name = name
+        self.datastore_name = name
         self.indexed = indexed
         self.repeated = repeated
         self.required = required
         self.choices = choices
         self.validators: List[Callable] = validators or []
 
-        # NDB Standard: repeated properties default to an empty list
         if self.repeated and default is None:
             self.default = []
         else:
             self.default = default
 
-        # Ensure all validators are callable
         for validator in self.validators:
             if not callable(validator):
                 raise TypeError(f"Validator {validator} for property '{self}' is not callable")
@@ -51,8 +49,8 @@ class Property:
     def __set_name__(self, owner, name: str):
         """Called by Python to set the attribute name on the owner class."""
         self._python_name = name
-        if not self._datastore_name:
-            self._datastore_name = name
+        if not self.datastore_name:
+            self.datastore_name = name
 
     def _validate_type(self, value: Any) -> Any:
         """Override in subclasses to enforce Python types."""
@@ -60,18 +58,14 @@ class Property:
 
     def _validate_single_value(self, instance: "Model", value: Any) -> Any:
         """Validates a single item (used directly, or mapped over a list if repeated=True)"""
-        # 1. Enforce type
         value = self._validate_type(value)
 
-        # 2. Enforce choices
         if self.choices is not None and value not in self.choices:
             raise ValueError(f"Value '{value}' must be one of {self.choices}")
 
-        # 3. Apply property-level validators (inline)
         for validator in self.validators:
             value = validator(value)
 
-        # 4. Apply field validators (model methods)
         field_validator_methods = getattr(instance, "_field_validators", {}).get(self._python_name, [])
         for method_name in field_validator_methods:
             method = getattr(instance, method_name)
@@ -83,13 +77,11 @@ class Property:
         """
         Validate and process a value for this property.
         """
-        # 1. Check required
         if value is None:
             if self.required:
                 raise ValueError(f"Property '{self._python_name}' is required")
             return [] if self.repeated else None
 
-        # 2. Handle Repeated (List) vs Single Value
         if self.repeated:
             if not isinstance(value, (list, tuple, set)):
                 raise TypeError(f"Property '{self._python_name}' is repeated and requires an iterable")
@@ -105,10 +97,6 @@ class Property:
             return validated_list
         else:
             return self._validate_single_value(instance, value)
-
-    # --------------------
-    # Descriptor protocol
-    # --------------------
 
     def __get__(self, instance: Optional["Model"], owner):
         if instance is None:

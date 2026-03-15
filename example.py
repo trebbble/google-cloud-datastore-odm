@@ -6,6 +6,8 @@ To run this locally, you need:
   - A .env file with: DATASTORE_EMULATOR_HOST=localhost:10000 and GOOGLE_CLOUD_PROJECT=google-cloud-datastore-odm-dev
 """
 
+import json
+
 from dotenv import load_dotenv
 
 from src.google_cloud_datastore_odm import IntegerProperty, Model, StringProperty
@@ -203,8 +205,10 @@ print(f"After put key: {draft.key}, ID: {draft.id}")
 print("\n--- Introspection ---")
 print(f"Article kind: {Article.kind()}")
 print(f"Comment kind: {Comment.kind()}")
-print(f"Article properties: {list(Article._properties.keys())}")
-
+print(f"Article full schema: {json.dumps(Article.get_schema(), indent=2)}")
+print(f"Article properties: {Article.get_schema(output_format='properties')}")
+print(f"Article named properties: {Article.get_schema(output_format='named_properties')}")
+print(f"Article properties aliases: {json.dumps(Article.get_schema(output_format='property_aliases'), indent=2)}")
 
 # ---------------------------------------------------------------------------
 # 13. Validation errors

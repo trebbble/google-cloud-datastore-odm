@@ -146,3 +146,39 @@ def test_init_with_callable_default():
     instance = CallableDefaultModel()
 
     assert instance.dynamic_field == "dynamically_generated"
+
+
+def test_get_schema_formats():
+
+    def dynamic_default(): pass
+
+    class SchemaTestModel(Model):
+        title = StringProperty(required=True)
+        author = StringProperty(name="author_name", default="Anonymous")
+        dynamic = StringProperty(default=dynamic_default)
+
+    props_list = SchemaTestModel.get_schema("properties")
+    assert isinstance(props_list, list)
+    assert len(props_list) == 3
+    assert hasattr(props_list[0], "datastore_name")
+
+    names = SchemaTestModel.get_schema("property_names")
+    assert names == ["title", "author", "dynamic"]
+
+    named_props = SchemaTestModel.get_schema("named_properties")
+    assert isinstance(named_props, dict)
+    assert named_props["title"].required is True
+
+    aliases = SchemaTestModel.get_schema("property_aliases")
+    assert aliases == {"title": "title", "author": "author_name", "dynamic": "dynamic"}
+
+    full_schema = SchemaTestModel.get_schema()
+    assert isinstance(full_schema, dict)
+    assert full_schema["title"]["type"] == "StringProperty"
+    assert full_schema["title"]["required"] is True
+    assert full_schema["author"]["datastore_name"] == "author_name"
+    assert full_schema["author"]["default"] == "Anonymous"
+    assert full_schema["dynamic"]["default"] == "<callable: dynamic_default>"
+
+    with pytest.raises(ValueError):
+        SchemaTestModel.get_schema("not_a_real_format")
