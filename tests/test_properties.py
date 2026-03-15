@@ -150,7 +150,6 @@ def test_metaclass_rejects_non_callable_field_validator():
             pass
 
         bad_mock = MockValidator()
-        # Set the attribute manually to bypass the decorator and test the metaclass
         bad_mock.__field_validator__ = 'text'
 
         class BadModel(Model):
@@ -165,3 +164,40 @@ def test_base_property_validate_type():
 
     instance = BasePropModel(untyped_field={"complex": "object"})
     assert instance.untyped_field == {"complex": "object"}
+
+
+def test_repeated_property():
+    class RepeatedModel(Model):
+        tags = StringProperty(repeated=True)
+        req_tags = StringProperty(repeated=True, required=True)
+
+    instance = RepeatedModel(req_tags=["init"])
+    assert instance.tags == []
+
+    instance.tags = ["python", "odm"]
+    assert instance.tags == ["python", "odm"]
+
+    with pytest.raises(TypeError):
+        instance.tags = "not_a_list"
+
+    with pytest.raises(TypeError):
+        instance.tags = ["valid", 123]
+
+    with pytest.raises(ValueError):
+        instance.req_tags = []
+
+    with pytest.raises(ValueError):
+        instance.tags = ["valid", None]
+
+    instance.tags = None
+    assert instance.tags == []
+
+
+def test_property_choices_violation():
+    class ChoiceModel(Model):
+        status = StringProperty(choices=["draft", "published"])
+
+    instance = ChoiceModel(status="draft")
+
+    with pytest.raises(ValueError, match="must be one of"):
+        instance.status = "archived"

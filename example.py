@@ -16,25 +16,37 @@ load_dotenv()
 
 # ---------------------------------------------------------------------------
 # 1. Model Definition
-#    - Use __kind__ to customize the Datastore kind (defaults to class name).
-#    - Properties enforce Python types and required states.
-#    - Use required=True to enforce presence, default= for fallback values.
+#    - __kind__: Customizes the Datastore kind (defaults to class name).
+#    - required/default: Enforce presence or provide fallback values.
+#    - choices: Restricts assignments to a specific list of values.
+#    - repeated: Turns the property into a list (defaults to []).
+#    - indexed: Excludes massive text blocks from Datastore indexes to save space/money.
+#    - name: Maps the Python attribute to a legacy/different Datastore column name.
 # ---------------------------------------------------------------------------
 
 class Article(Model):
     __kind__ = "Article"
 
     title = StringProperty(required=True)
-    author = StringProperty(required=True)
-    status = StringProperty(default="draft")
+    # Maps 'author' in Python to 'author_name' in Datastore
+    author = StringProperty(required=True, name="author_name")
+
+    # Built-in choices validation
+    status = StringProperty(default="draft", choices=["draft", "published", "archived"])
+    rating = IntegerProperty(choices=[1, 2, 3, 4, 5])
+
     word_count = IntegerProperty(default=0)
-    rating = IntegerProperty()
+
+    # Repeated list of strings
+    tags = StringProperty(repeated=True)
+
+    # Unindexed property (cannot be filtered on in queries)
+    internal_notes = StringProperty(indexed=False)
 
     # -----------------------------------------------------------------------
     # 2. Field-level validators
     #    - Decorated with @field_validator('property_name').
     #    - Run automatically during property assignment.
-    #    - Useful for length checks, choices, and numeric bounds.
     # -----------------------------------------------------------------------
 
     @field_validator('title')
@@ -43,30 +55,17 @@ class Article(Model):
             raise ValueError("Title must be between 3 and 200 characters.")
         return value
 
-    @field_validator('status')
-    def validate_status(self, value: str) -> str:
-        valid_statuses = ["draft", "published", "archived"]
-        if value not in valid_statuses:
-            raise ValueError(f"Status must be one of {valid_statuses}")
-        return value
-
     @field_validator('word_count')
     def validate_word_count(self, value: int) -> int:
         if value < 0:
             raise ValueError("Word count cannot be negative.")
         return value
 
-    @field_validator('rating')
-    def validate_rating(self, value: int) -> int:
-        if value not in [1, 2, 3, 4, 5]:
-            raise ValueError("Rating must be an integer between 1 and 5.")
-        return value
-
     # -----------------------------------------------------------------------
     # 3. Model-level validators
     #    - Decorated with @model_validator.
     #    - Run when .validate() or .put() is called.
-    #    - Used for cross-property logic (e.g., status depends on word_count).
+    #    - Used for cross-property logic.
     # -----------------------------------------------------------------------
 
     @model_validator
@@ -96,14 +95,22 @@ class Comment(Model):
 
 
 # ---------------------------------------------------------------------------
-# 5. Instance creation
+# 5. Instance creation (with explicit 'id' shortcut)
 # ---------------------------------------------------------------------------
 
 print("--- Instance Creation ---")
-article = Article(title="Hello, World!", author="Alice", word_count=500)
+# Notice we are using id="..." here to explicitly set the Datastore Key name!
+article = Article(
+    id="my-first-article",
+    title="Hello, World!",
+    author="Alice",
+    word_count=500,
+    tags=["python", "odm"],
+    internal_notes="Review again tomorrow."
+)
 print(f"Created: {article}")
 print(f"Has key: {article.has_key}")
-print(f"ID before save: {article.id}")
+print(f"Explicit ID: {article.id}")
 
 comment = Comment(body="Great article!", score=5)
 print(f"Created comment: {comment}")
@@ -126,15 +133,12 @@ print("to_dict():", article.to_dict())
 
 # ---------------------------------------------------------------------------
 # 7. Persisting to Datastore (.put)
-#    - Runs model-level validators before writing.
-#    - Assigns & returns a Datastore key on the instance.
 # ---------------------------------------------------------------------------
 
 print("\n--- Persistence ---")
 saved_article = article.put()
 print(f"Saved article: {saved_article}")
 print(f"Key: {saved_article.key}")
-print(f"ID: {saved_article.id}")
 
 
 # ---------------------------------------------------------------------------
@@ -145,6 +149,7 @@ print("\n--- Fetching by Key ---")
 fetched = Article.get(key=saved_article.key)
 print(f"Fetched: {fetched}")
 print(f"Fetched ID: {fetched.id}")
+print(f"Fetched Tags (Repeated): {fetched.tags}")
 
 
 # ---------------------------------------------------------------------------
@@ -152,10 +157,10 @@ print(f"Fetched ID: {fetched.id}")
 # ---------------------------------------------------------------------------
 
 print("\n--- Get by ID ---")
-key_from_id = Article.key_from_id(saved_article.id)
+key_from_id = Article.key_from_id("my-first-article")
 print(f"Constructed key: {key_from_id}")
-fetched_by_id = Article.get_by_id(saved_article.id)
-print(f"Fetched by ID: {fetched_by_id}")
+fetched_by_id = Article.get_by_id("my-first-article")
+print(f"Fetched by explicit ID: {fetched_by_id}")
 
 
 # ---------------------------------------------------------------------------
@@ -163,24 +168,20 @@ print(f"Fetched by ID: {fetched_by_id}")
 # ---------------------------------------------------------------------------
 
 print("\n--- Queries ---")
-Article(title="Tutorial: Python ODM", author="Bob", status="published", word_count=1200).put()
-Article(title="Advanced Queries", author="Alice", status="published", word_count=800).put()
+Article(title="Tutorial: Python ODM", author="Bob", status="published", word_count=1200, tags=["tutorial"]).put()
+Article(title="Advanced Queries", author="Alice", status="published", word_count=800, tags=["advanced"]).put()
 
-results = list(Article.query().filter("author", "=", "Alice").fetch())
+# Note: Datastore filters use the Datastore alias name under the hood,
+# but for now we filter using the mapped names.
+results: list[Article] = list(Article.query().filter("author_name", "=", "Alice").fetch())
 print(f"Alice's articles: {len(results)} found")
 for r in results:
-    print(f"  - {r.title} (status={r.status})")
+    # Adding an explicit type hint to satisfy PyCharm's static analyzer
+    r: Article
+    print(f"  - {r.title} (status={r.status}, tags={r.tags})")
 
-results = list(
-    Article.query()
-    .filter("author", "=", "Alice")
-    .filter("status", "=", "published")
-    .fetch()
-)
-print(f"Alice's published articles: {len(results)} found")
-
-results = list(Article.query().fetch(limit=2))
-print(f"First 2 articles (limited): {len(results)} returned")
+results_limited: list[Article] = list(Article.query().fetch(limit=2))
+print(f"First 2 articles (limited): {len(results_limited)} returned")
 
 
 # ---------------------------------------------------------------------------
@@ -216,9 +217,14 @@ except ValueError as e:
     print(f"Caught field validation error: {e}")
 
 try:
-    bad_comment = Comment(body="Love it! 😊")  # triggers inline validator
+    bad_choice = Article(title="Test", author="Dave", status="deleted")  # 'deleted' not in choices
 except ValueError as e:
-    print(f"Caught inline validator error: {e}")
+    print(f"Caught built-in choice error: {e}")
+
+try:
+    bad_list = Article(title="Test", author="Dave", tags="not-a-list")  # passing string to repeated
+except TypeError as e:
+    print(f"Caught repeated property type error: {e}")
 
 try:
     unpublishable = Article(title="No Content", author="Eve", status="published", word_count=0)

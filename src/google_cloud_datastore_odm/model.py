@@ -1,3 +1,4 @@
+import copy
 from collections import defaultdict
 from typing import Any, Callable, ClassVar, Dict, List, Optional
 
@@ -107,36 +108,50 @@ class Model(metaclass=ModelMeta):
     - Datastore persistence
     - Entity hydration
     """
-
     # --- metaclass-injected attributes (declared for type checkers) ---
     _properties: ClassVar[Dict[str, Property]] = {}
     _model_validators: ClassVar[List[Callable]] = []
     _field_validators: ClassVar[Dict[str, List[str]]] = {}
     _kind: ClassVar[str]
 
-    # Datastore entity key (identity)
     key: Optional[datastore.Key] = None
 
     def __init__(self, **kwargs: Any) -> None:
         """
         Initialize a model instance.
-
-        Property values are validated on assignment.
-        The datastore key may be optionally provided via `key=...`.
         """
         self._values: Dict[str, Any] = {}
 
-        # Extract datastore key if provided
-        self.key = kwargs.pop("key", None)
+        # 1. Key generation (Support for NDB-style id=...)
+        _id = kwargs.pop("id", None)
+        parent = kwargs.pop("parent", None)
 
-        # Populate properties, apply defaults and enforce required ones
+        if _id:
+            self.key = self.key_from_id(_id, parent=parent) # 130
+        else:
+            self.key = kwargs.pop("key", None)
+
+        # 2. Populate properties
         for property_name, _property in self._properties.items():
             if property_name in kwargs:
-                setattr(self, property_name, kwargs[property_name])
+                setattr(self, property_name, kwargs.pop(property_name))
             elif _property.default is not None:
-                setattr(self, property_name, _property.default)
+                # 1. If the default is a callable (like `list` or `datetime.utcnow`), call it!
+                if callable(_property.default):
+                    default_val = _property.default() # 141
+                else:
+                    # 2. Otherwise, safely deepcopy to prevent shared references in lists/dicts
+                    try:
+                        default_val = copy.deepcopy(_property.default)
+                    except TypeError:
+                        default_val = _property.default  # Fallback
+                setattr(self, property_name, default_val)
             elif _property.required:
                 raise ValueError(f"{property_name} is required")
+
+        # Optional: Raise error on unknown properties for strict schemas
+        if kwargs:
+            raise AttributeError(f"Unknown properties provided to {self.__class__.__name__}: {list(kwargs.keys())}")
 
     def __repr__(self) -> str:
         property_repr = ", ".join(
@@ -233,20 +248,27 @@ class Model(metaclass=ModelMeta):
     def put(self):
         """
         Persist the model instance to datastore.
-
-        Executes model-level validation before writing.
         """
         self.validate()
-
         self._ensure_key()
-
         client = self._client()
-        entity = datastore.Entity(key=self.key)
 
-        for property_name in self._properties:
-            value = self._values.get(property_name)
+        # Gather unindexed properties
+        unindexed_names = [
+            prop._datastore_name for prop in self._properties.values() if not prop.indexed
+        ]
+
+        entity = datastore.Entity(
+            key=self.key,
+            exclude_from_indexes=tuple(unindexed_names)
+        )
+
+        for py_name, prop in self._properties.items():
+            value = self._values.get(py_name)
+
+            # Write to Datastore using the datastore_name
             if value is not None:
-                entity[property_name] = value
+                entity[prop._datastore_name] = value
 
         client.put(entity)
         self.key = entity.key
@@ -258,6 +280,12 @@ class Model(metaclass=ModelMeta):
         if entity is None:
             return None
 
-        instance = cls(**entity)
-        instance.key = entity.key
+        kwargs = {}
+
+        # Read from Datastore using the datastore_name, but instantiate using the python_name
+        for py_name, prop in cls._properties.items():
+            if prop._datastore_name in entity:
+                kwargs[py_name] = entity[prop._datastore_name]
+
+        instance = cls(key=entity.key, **kwargs)
         return instance
