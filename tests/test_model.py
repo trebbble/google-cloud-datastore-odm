@@ -182,3 +182,72 @@ def test_get_schema_formats():
 
     with pytest.raises(ValueError):
         SchemaTestModel.get_schema("not_a_real_format")
+
+
+def test_metaclass_rejects_reserved_property_names():
+    """Ensure the ODM protects its internal identity attributes."""
+
+    with pytest.raises(ValueError):
+        class BadModelId(Model):
+            id = StringProperty()
+
+    with pytest.raises(ValueError):
+        class BadModelKey(Model):
+            key = StringProperty()
+
+    with pytest.raises(ValueError):
+        class BadModelParent(Model):
+            parent = StringProperty()
+
+
+def test_metaclass_allows_aliased_reserved_names():
+    """Ensure developers can still map to legacy datastore fields using aliases."""
+
+    class ValidModel(Model):
+        custom_id = StringProperty(name="id")
+        custom_key = StringProperty(name="key")
+
+    assert "custom_id" in ValidModel.get_schema(output_format='property_names')
+    assert ValidModel.get_schema(output_format='property_aliases')["custom_id"] == "id"
+    assert ValidModel.get_schema(output_format='named_properties')["custom_key"].datastore_name == "key"
+
+
+def test_model_init_reserved_kwargs_routing():
+    """Ensure id, parent, and key kwargs are correctly routed to Datastore Keys."""
+
+    class TestNode(Model):
+        __kind__ = "TestNode"
+        value = StringProperty()
+
+    node1 = TestNode(id="my-node-1", value="test")
+    assert node1.key is not None
+    assert node1.key.name == "my-node-1"
+    assert node1.id == "my-node-1"
+
+    client = get_client()
+
+    parent_key = client.key("ParentKind", "parent-1")
+    node2 = TestNode(parent=parent_key, value="test")
+    assert node2.key is not None
+    assert node2.key.parent == parent_key
+    assert node2.key.is_partial is True
+    assert node2.key.parent == parent_key
+
+    node3 = TestNode(id=999, parent=parent_key, value="test")
+    assert node3.key.id == 999
+    assert node3.key.parent == parent_key
+
+    explicit_key = client.key("TestNode", "explicit")
+    node4 = TestNode(key=explicit_key, value="test")
+    assert node4.key == explicit_key
+    assert node4.id == "explicit"
+
+
+def test_model_init_unknown_kwargs():
+    """Ensure passing random kwargs still raises a strict schema error."""
+
+    class StrictModel(Model):
+        name = StringProperty()
+
+    with pytest.raises(AttributeError):
+        StrictModel(name="Alice", typo_field="value")

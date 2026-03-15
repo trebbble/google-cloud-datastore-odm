@@ -97,10 +97,36 @@ class Comment(Model):
 
 
 # ---------------------------------------------------------------------------
-# 5. Instance creation (with explicit 'id' shortcut)
+# 5. Reserved Words and Legacy Aliasing
+#    - 'id', 'key', and 'parent' are reserved by the ODM for Datastore routing.
+#    - If a legacy Datastore table has a column literally named "id",
+#      use the `name="id"` alias to map it to a safe Python property.
 # ---------------------------------------------------------------------------
 
-print("--- Instance Creation ---")
+print("--- Reserved Words and Aliasing ---")
+try:
+    # This will raise a ValueError immediately at class creation time.
+    class BadModel(Model):
+        id = StringProperty()
+except ValueError as e:
+    print(f"Correctly caught reserved word error: {e}")
+
+
+class LegacyDataModel(Model):
+    # This maps the Python attribute `legacy_id` to the Datastore column `id`.
+    legacy_id = StringProperty(name="id")
+
+
+# Here `id="..."` sets the Datastore Key ID, while `legacy_id="..."` sets the Datastore property!
+legacy_instance = LegacyDataModel(id="datastore-key-123", legacy_id="uuid-456")
+print(f"Mapped Legacy Instance: Key ID = {legacy_instance.id}, Property = {legacy_instance.legacy_id}")
+
+
+# ---------------------------------------------------------------------------
+# 6. Instance creation (with explicit 'id' shortcut)
+# ---------------------------------------------------------------------------
+
+print("\n--- Instance Creation ---")
 # Notice we are using id="..." here to explicitly set the Datastore Key name!
 article = Article(
     id="my-first-article",
@@ -119,7 +145,7 @@ print(f"Created comment: {comment}")
 
 
 # ---------------------------------------------------------------------------
-# 6. Dictionary-style access and iteration
+# 7. Dictionary-style access and iteration
 # ---------------------------------------------------------------------------
 
 print("\n--- Dict-style and Iteration ---")
@@ -134,7 +160,7 @@ print("to_dict():", article.to_dict())
 
 
 # ---------------------------------------------------------------------------
-# 7. Persisting to Datastore (.put)
+# 8. Persisting to Datastore (.put)
 # ---------------------------------------------------------------------------
 
 print("\n--- Persistence ---")
@@ -144,7 +170,7 @@ print(f"Key: {saved_article.key}")
 
 
 # ---------------------------------------------------------------------------
-# 8. Fetching by key (.get)
+# 9. Fetching by key (.get)
 # ---------------------------------------------------------------------------
 
 print("\n--- Fetching by Key ---")
@@ -155,7 +181,7 @@ print(f"Fetched Tags (Repeated): {fetched.tags}")
 
 
 # ---------------------------------------------------------------------------
-# 9. Fetching by numeric/string ID (.get_by_id, .key_from_id)
+# 10. Fetching by numeric/string ID (.get_by_id, .key_from_id)
 # ---------------------------------------------------------------------------
 
 print("\n--- Get by ID ---")
@@ -166,7 +192,7 @@ print(f"Fetched by explicit ID: {fetched_by_id}")
 
 
 # ---------------------------------------------------------------------------
-# 10. Query passthrough (.query().filter().fetch())
+# 11. Query passthrough (.query().filter().fetch())
 # ---------------------------------------------------------------------------
 
 print("\n--- Queries ---")
@@ -187,7 +213,7 @@ print(f"First 2 articles (limited): {len(results_limited)} returned")
 
 
 # ---------------------------------------------------------------------------
-# 11. Explicit key allocation (.allocate_key)
+# 12. Explicit key allocation (.allocate_key)
 # ---------------------------------------------------------------------------
 
 print("\n--- Key Allocation ---")
@@ -199,19 +225,21 @@ print(f"After put key: {draft.key}, ID: {draft.id}")
 
 
 # ---------------------------------------------------------------------------
-# 12. Model kind introspection
+# 13. Model kind introspection
 # ---------------------------------------------------------------------------
 
 print("\n--- Introspection ---")
 print(f"Article kind: {Article.kind()}")
 print(f"Comment kind: {Comment.kind()}")
+# Showing the different format options for get_schema
 print(f"Article full schema: {json.dumps(Article.get_schema(), indent=2)}")
 print(f"Article properties: {Article.get_schema(output_format='properties')}")
 print(f"Article named properties: {Article.get_schema(output_format='named_properties')}")
 print(f"Article properties aliases: {json.dumps(Article.get_schema(output_format='property_aliases'), indent=2)}")
 
+
 # ---------------------------------------------------------------------------
-# 13. Validation errors
+# 14. Validation errors
 # ---------------------------------------------------------------------------
 
 print("\n--- Validation Examples ---")

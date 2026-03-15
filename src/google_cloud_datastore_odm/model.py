@@ -62,9 +62,18 @@ class ModelMeta(type):
             for field, methods in getattr(base_class, "_field_validators", {}).items():
                 collected_field_validators[field].extend(methods)
 
+        _reserved_names = {"key", "id", "parent"}
+
         # Collect properties and validators
         for attribute_name, attribute_value in class_attrs.items():
             if isinstance(attribute_value, Property):
+                if attribute_name in _reserved_names:
+                    raise ValueError(
+                        f"Property name '{attribute_name}' on '{class_name}' is reserved by the ODM. "
+                        f"If you need to map to a Datastore field named '{attribute_name}', "
+                        f"use a different Python attribute name and the alias feature: e.g., "
+                        f"custom_{attribute_name} = Property(name='{attribute_name}')"
+                    )
                 collected_properties[attribute_name] = attribute_value
 
             if getattr(attribute_value, MODEL_VALIDATOR_ATTR, False):
@@ -119,11 +128,14 @@ class Model(metaclass=ModelMeta):
 
         _id = kwargs.pop("id", None)
         parent = kwargs.pop("parent", None)
+        key = kwargs.pop("key", None)
 
-        if _id:
+        if _id is not None:
             self.key = self.key_from_id(_id, parent=parent)
         else:
-            self.key = kwargs.pop("key", None)
+            self.key = key
+            if self.key is None and parent is not None:
+                self.key = self._client().key(self._kind, parent=parent)
 
         for property_name, _property in self._properties.items():
             if property_name in kwargs:
