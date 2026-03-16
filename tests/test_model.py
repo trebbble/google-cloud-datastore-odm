@@ -1,4 +1,5 @@
 import pytest
+from google.cloud import datastore
 
 from src.google_cloud_datastore_odm.client import get_client
 from src.google_cloud_datastore_odm.model import Model, field_validator
@@ -562,3 +563,89 @@ def test_delete_multi(reset_datastore):
     assert BatchDelModel.get(keys[2]) is None
 
     BatchDelModel.delete_multi([])
+
+
+def test_has_complete_key():
+    """Ensure has_complete_key correctly identifies partial vs complete keys."""
+
+    class KeyStatusModel(Model):
+        __kind__ = "KeyStatusModel"
+        name = StringProperty()
+
+    m1 = KeyStatusModel(name="Alice")
+    assert m1.has_complete_key is False
+
+    m1._ensure_key()
+    assert m1.key is not None
+    assert m1.key.is_partial is True
+    assert m1.has_complete_key is False
+
+    m2 = KeyStatusModel(id="my-custom-id", name="Bob")
+    assert m2.has_complete_key is True
+    assert m2.key.is_partial is False
+
+    m3 = KeyStatusModel(id=123, name="Charlie")
+    assert m3.has_complete_key is True
+
+
+def test_allocate_ids():
+    """Ensure allocate_ids successfully reserves a batch of numeric IDs from Datastore."""
+
+    class AllocModel(Model):
+        __kind__ = "AllocModel"
+
+    keys = AllocModel.allocate_ids(size=5)
+
+    assert len(keys) == 5
+    for key in keys:
+        assert isinstance(key, datastore.Key)
+        assert key.is_partial is False
+        assert isinstance(key.id, int)
+        assert key.kind == "AllocModel"
+
+    client = get_client()
+    parent_key = client.key("ParentKind", "parent-1")
+    child_keys = AllocModel.allocate_ids(size=2, parent=parent_key)
+
+    assert len(child_keys) == 2
+    assert child_keys[0].parent == parent_key
+
+    with pytest.raises(ValueError, match="Number of IDs to allocate must be greater than 0"):
+        AllocModel.allocate_ids(size=0)
+
+
+def test_allocate_key_instance():
+    """Ensure allocate_key assigns a real database ID to an instance."""
+
+    class AllocInstModel(Model):
+        __kind__ = "AllocInstModel"
+
+    m = AllocInstModel()
+    assert m.has_complete_key is False
+
+    allocated_key = m.allocate_key()
+
+    assert allocated_key is not None
+    assert allocated_key == m.key
+    assert m.has_complete_key is True
+    assert isinstance(m.key.id, int)
+
+
+def test_ensure_key_no_rpc():
+    """Ensure _ensure_key assigns an incomplete key without needing the emulator."""
+
+    class EnsureModel(Model):
+        __kind__ = "EnsureModel"
+
+    m = EnsureModel()
+    assert m.key is None
+
+    m._ensure_key()
+
+    assert m.key is not None
+    assert m.key.is_partial is True
+    assert m.key.kind == "EnsureModel"
+
+    original_key = m.key
+    m._ensure_key()
+    assert m.key is original_key

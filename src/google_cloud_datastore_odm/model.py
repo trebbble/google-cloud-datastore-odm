@@ -292,20 +292,46 @@ class Model(metaclass=ModelMeta):
                 f"Unknown output format '{output_format}'. Must be one of {valid_formats}"
             )
 
+    @property
+    def has_complete_key(self) -> bool:
+        """
+        Return True if the model has a fully resolved key (contains an ID or name).
+        Maps to the modern Datastore's `.is_partial` property.
+        """
+        return self.key is not None and not self.key.is_partial
+
+    @classmethod
+    def allocate_ids(cls, size: int, parent: Optional[datastore.Key] = None) -> List[datastore.Key]:
+        """
+        NDB Parity: Allocate a batch of integer IDs for this model's kind.
+        Useful for generating guaranteed-unique IDs before creating instances.
+        """
+        if size <= 0:
+            raise ValueError("Number of IDs to allocate must be greater than 0.")
+
+        client = cls._client()
+        incomplete_key = client.key(cls._kind, parent=parent)
+        return client.allocate_ids(incomplete_key, num_ids=size)
+
     def allocate_key(self, parent: Optional[datastore.Key] = None) -> datastore.Key:
         """
-        Explicitly allocate a datastore key for this model instance.
+        Explicitly allocate a complete datastore key for this specific instance
+        via an RPC call.
         """
-        if self.key is None:
-            incomplete_key = self._client().key(self._kind, parent=parent)
-            self.key = self._client().allocate_ids(incomplete_key, num_ids=1)[0]
+        if not self.has_complete_key:
+            actual_parent = parent or (self.key.parent if self.key else None)
+            self.key = self.allocate_ids(size=1, parent=actual_parent)[0]
 
         return self.key
 
     def _ensure_key(self) -> None:
-        """Ensure the model has a key before persistence."""
+        """
+        Ensure the model has at least an incomplete key before persistence.
+        Does NOT trigger an RPC call. The Datastore backend will auto-assign
+        the ID during the put() operation.
+        """
         if self.key is None:
-            self.allocate_key()
+            self.key = self._client().key(self._kind)
 
     @classmethod
     def _client(cls) -> datastore.Client:
