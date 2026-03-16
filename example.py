@@ -98,28 +98,39 @@ class Comment(Model):
 
 # ---------------------------------------------------------------------------
 # 5. Reserved Words and Legacy Aliasing
-#    - 'id', 'key', and 'parent' are reserved by the ODM for Datastore routing.
-#    - If a legacy Datastore table has a column literally named "id",
-#      use the `name="id"` alias to map it to a safe Python property.
+#    - 'key' is reserved by the ODM for Datastore routing and properties exposure
+#    - If a legacy Datastore table has a column literally named "key",
+#      use the `name="key"` alias to map it to a safe Python property.
+#    Properties 'id' and 'parent' can also be declared. In that case, if one needs to pass a direct ID for
+#    the entity to be created, or a parent ancestor, they can do by using the alias prefix '_'
 # ---------------------------------------------------------------------------
 
 print("--- Reserved Words and Aliasing ---")
 try:
     # This will raise a ValueError immediately at class creation time.
     class BadModel(Model):
-        id = StringProperty()
+        key = StringProperty()
 except ValueError as e:
     print(f"Correctly caught reserved word error: {e}")
 
 
 class LegacyDataModel(Model):
-    # This maps the Python attribute `legacy_id` to the Datastore column `id`.
-    legacy_id = StringProperty(name="id")
+    # This maps the Python attribute `legacy_key` to the Datastore column `key`.
+    legacy_key = StringProperty(name='key')
+    id = StringProperty()
+    parent = StringProperty()
 
 
-# Here `id="..."` sets the Datastore Key ID, while `legacy_id="..."` sets the Datastore property!
-legacy_instance = LegacyDataModel(id="datastore-key-123", legacy_id="uuid-456")
-print(f"Mapped Legacy Instance: Key ID = {legacy_instance.id}, Property = {legacy_instance.legacy_id}")
+parent_key = LegacyDataModel.key_from_id("parent-1")
+legacy_instance = LegacyDataModel(
+    _id="datastore-key-123", _parent=parent_key,
+    legacy_key="some-key",
+    id="my_custom_id",
+    parent="my_custom_parent"
+)
+legacy_instance.put()
+print(f"Mapped Legacy Instance: Key ID = {legacy_instance.key.name}, Parent = {legacy_instance.key.parent}")
+print(f"Legacy dict data: {json.dumps(legacy_instance.to_dict(), indent=4)}")
 
 
 # ---------------------------------------------------------------------------
@@ -137,8 +148,8 @@ article = Article(
     internal_notes="Review again tomorrow."
 )
 print(f"Created: {article}")
-print(f"Has key: {article.has_key}")
-print(f"Explicit ID: {article.id}")
+print(f"Has key: {article.key is not None}")
+print(f"Explicit ID: {article.key.id_or_name}")
 
 comment = Comment(body="Great article!", score=5)
 print(f"Created comment: {comment}")
@@ -176,7 +187,7 @@ print(f"Key: {saved_article.key}")
 print("\n--- Fetching by Key ---")
 fetched = Article.get(key=saved_article.key)
 print(f"Fetched: {fetched}")
-print(f"Fetched ID: {fetched.id}")
+print(f"Fetched ID: {fetched.key.id_or_name}")
 print(f"Fetched Tags (Repeated): {fetched.tags}")
 
 
@@ -221,7 +232,7 @@ draft = Article(title="Unfinished Draft", author="Carol", status="draft", word_c
 draft.allocate_key()
 print(f"Allocated key before put: {draft.key}")
 draft.put()
-print(f"After put key: {draft.key}, ID: {draft.id}")
+print(f"After put key: {draft.key}, ID: {draft.key.id_or_name}")
 
 
 # ---------------------------------------------------------------------------

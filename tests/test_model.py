@@ -2,7 +2,7 @@ import pytest
 
 from src.google_cloud_datastore_odm.client import get_client
 from src.google_cloud_datastore_odm.model import Model
-from src.google_cloud_datastore_odm.properties import Property, StringProperty
+from src.google_cloud_datastore_odm.properties import Property, StringProperty, IntegerProperty
 
 
 class KeyTestModel(Model):
@@ -33,21 +33,21 @@ def test_model_to_dict():
 
 def test_has_key():
     model = KeyTestModel(name="test")
-    assert not model.has_key
+    assert model.key is None
     model.allocate_key()
-    assert model.has_key
+    assert model.key is not None
 
 
 def test_id_property():
     model = KeyTestModel(name="test")
-    assert model.id is None
+    assert model.key is None
 
     client = get_client()
     model.key = client.key("KeyTestModel", 123)
-    assert model.id == 123
+    assert model.key.id == 123
     
     model.key = client.key("KeyTestModel", "named_key")
-    assert model.id == "named_key"
+    assert model.key.name == "named_key"
 
 
 def test_key_from_id_and_get_by_id(reset_datastore):
@@ -61,7 +61,7 @@ def test_key_from_id_and_get_by_id(reset_datastore):
     fetched = KeyTestModel.get_by_id(123)
     assert fetched is not None
     assert fetched.name == "test"
-    assert fetched.id == 123
+    assert fetched.key.id == 123
 
 
 def test_from_entity_none():
@@ -132,7 +132,6 @@ def test_init_with_explicit_id(reset_datastore):
 
     assert instance.key is not None
     assert instance.key.id == 999
-    assert instance.id == 999
 
 
 def test_init_with_callable_default():
@@ -188,16 +187,8 @@ def test_metaclass_rejects_reserved_property_names():
     """Ensure the ODM protects its internal identity attributes."""
 
     with pytest.raises(ValueError):
-        class BadModelId(Model):
-            id = StringProperty()
-
-    with pytest.raises(ValueError):
         class BadModelKey(Model):
             key = StringProperty()
-
-    with pytest.raises(ValueError):
-        class BadModelParent(Model):
-            parent = StringProperty()
 
 
 def test_metaclass_allows_aliased_reserved_names():
@@ -222,7 +213,6 @@ def test_model_init_reserved_kwargs_routing():
     node1 = TestNode(id="my-node-1", value="test")
     assert node1.key is not None
     assert node1.key.name == "my-node-1"
-    assert node1.id == "my-node-1"
 
     client = get_client()
 
@@ -240,7 +230,7 @@ def test_model_init_reserved_kwargs_routing():
     explicit_key = client.key("TestNode", "explicit")
     node4 = TestNode(key=explicit_key, value="test")
     assert node4.key == explicit_key
-    assert node4.id == "explicit"
+    assert node4.key.name == "explicit"
 
 
 def test_model_init_unknown_kwargs():
@@ -251,3 +241,83 @@ def test_model_init_unknown_kwargs():
 
     with pytest.raises(AttributeError):
         StrictModel(name="Alice", typo_field="value")
+
+
+def test_unreserved_metadata_kwarg():
+    """Ensure passing 'id' directly works if no 'id' property is defined."""
+
+    class NoIdModel(Model):
+        __kind__ = "NoId"
+        name = StringProperty()
+
+    instance = NoIdModel(id=444, name="Test")
+    assert instance.key is not None
+    assert instance.key.id == 444
+    assert instance.name == "Test"
+
+
+def test_reserved_metadata_kwarg():
+    """Ensure passing '_id' directly works if 'id' property is defined."""
+
+    class NoIdModel(Model):
+        __kind__ = "NoId"
+        id = IntegerProperty()
+        name = StringProperty()
+
+    instance = NoIdModel(_id=444, name="Test")
+    assert instance.key is not None
+    assert instance.key.id == 444
+    assert instance.name == "Test"
+
+
+def test_repr_numeric_id():
+    """Ensure __repr__ formats correctly when the key uses a numeric ID."""
+
+    class ReprModel(Model):
+        __kind__ = "Repr"
+        val = IntegerProperty()
+
+    instance = ReprModel(id=123, val=5)
+
+    repr_str = repr(instance)
+    assert "id=123" in repr_str
+    assert "val=5" in repr_str
+
+    instance = ReprModel(id='123', val=5)
+    repr_str = repr(instance)
+    assert "id='123'" in repr_str
+    assert "val=5" in repr_str
+
+
+def test_to_dict_include_exclude():
+    """Ensure to_dict correctly skips properties based on include/exclude lists."""
+
+    class FilterModel(Model):
+        a = StringProperty()
+        b = StringProperty()
+        c = StringProperty()
+
+    instance = FilterModel(a="apple", b="banana", c="cherry")
+
+    included = instance.to_dict(include=["a", "c"])
+    assert included == {"a": "apple", "c": "cherry"}
+    assert "b" not in included
+
+    excluded = instance.to_dict(exclude=["b"])
+    assert excluded == {"a": "apple", "c": "cherry"}
+    assert "b" not in excluded
+
+
+def test_populate_unknown_property():
+    """Ensure populate raises AttributeError for non-existent properties."""
+
+    class PopModel(Model):
+        name = StringProperty()
+
+    instance = PopModel(name="Initial")
+
+    instance.populate(name="Updated")
+    assert instance.name == "Updated"
+
+    with pytest.raises(AttributeError, match="Unknown property: invalid_field"):
+        instance.populate(invalid_field="Value")

@@ -12,7 +12,7 @@ def test_public_api_usage(reset_datastore):
 
     article.put()
     assert article.key is not None
-    assert article.id is not None
+    assert article.key.id is not None
 
     assert article.title == "Hello World"
     assert article.views == 0

@@ -62,7 +62,7 @@ class ModelMeta(type):
             for field, methods in getattr(base_class, "_field_validators", {}).items():
                 collected_field_validators[field].extend(methods)
 
-        _reserved_names = {"key", "id", "parent"}
+        _reserved_names = {"key"}
 
         # Collect properties and validators
         for attribute_name, attribute_value in class_attrs.items():
@@ -120,14 +120,30 @@ class Model(metaclass=ModelMeta):
 
     key: Optional[datastore.Key] = None
 
+    @classmethod
+    def _get_kwarg_or_alias(cls, kwargs: Dict[str, Any], keyword: str, default: Any = None) -> Any:
+        """
+        Extract Datastore routing metadata (id, parent) safely.
+        If the user defined a property with this name, they must use the `_` prefix
+        (e.g., `_id=...`) to route to the Datastore Key.
+        """
+        alt_keyword = f"_{keyword}"
+        if alt_keyword in kwargs:
+            return kwargs.pop(alt_keyword)
+
+        if keyword in kwargs and keyword not in cls._properties:
+            return kwargs.pop(keyword)
+
+        return default
+
     def __init__(self, **kwargs: Any) -> None:
         """
         Initialize a model instance.
         """
         self._values: Dict[str, Any] = {}
 
-        _id = kwargs.pop("id", None)
-        parent = kwargs.pop("parent", None)
+        _id = self._get_kwarg_or_alias(kwargs, "id")
+        parent = self._get_kwarg_or_alias(kwargs, "parent")
         key = kwargs.pop("key", None)
 
         if _id is not None:
@@ -159,7 +175,9 @@ class Model(metaclass=ModelMeta):
         property_repr = ", ".join(
             f"{name}={value!r}" for name, value in self._values.items()
         )
-        key_part = f" id={self.id!r}" if self.key else ""
+        key_part = ""
+        if self.key and self.key.id_or_name:
+            key_part = f" id={self.key.id_or_name!r}"
         return f"<{self.__class__.__name__}{key_part} {property_repr}>"
 
     def __getitem__(self, key: str) -> Any:
@@ -174,11 +192,20 @@ class Model(metaclass=ModelMeta):
     def items(self):
         return self._values.items()
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self, include: Optional[List[str]] = None,  exclude: Optional[List[str]] = None) -> Dict[str, Any]:
         """
         Return a shallow dictionary representation of the model properties.
         """
-        return dict(self._values)
+        result = {}
+        for py_name in self._properties:
+            if include and py_name not in include:
+                continue
+            if exclude and py_name in exclude:
+                continue
+
+            result[py_name] = self._values.get(py_name)
+
+        return result
 
     def validate(self) -> None:
         """
@@ -188,18 +215,6 @@ class Model(metaclass=ModelMeta):
         """
         for validator in self._model_validators:
             validator(self)
-
-    @property
-    def has_key(self) -> bool:
-        """Return True if the model instance has a datastore key assigned."""
-        return self.key is not None
-
-    @property
-    def id(self) -> Optional[Any]:
-        """Return the entity identifier (id or name) if a key exists."""
-        if self.key is None:
-            return None
-        return self.key.id or self.key.name
 
     @classmethod
     def kind(cls) -> str:
@@ -265,7 +280,9 @@ class Model(metaclass=ModelMeta):
         Explicitly allocate a datastore key for this model instance.
         """
         if self.key is None:
-            self.key = self._client().key(self._kind, parent=parent)
+            incomplete_key = self._client().key(self._kind, parent=parent)
+            self.key = self._client().allocate_ids(incomplete_key, num_ids=1)[0]
+
         return self.key
 
     def _ensure_key(self) -> None:
@@ -326,8 +343,18 @@ class Model(metaclass=ModelMeta):
                 entity[prop.datastore_name] = value
 
         client.put(entity)
-        self.key = entity.key
         return self
+
+    def populate(self, **kwargs: Any) -> None:
+        """
+        Update multiple properties at once.
+        Triggers all field validators during assignment.
+        """
+        for key, value in kwargs.items():
+            if key in self._properties:
+                setattr(self, key, value)
+            else:
+                raise AttributeError(f"Unknown property: {key}")
 
     @classmethod
     def from_entity(cls, entity: Optional[datastore.Entity]):

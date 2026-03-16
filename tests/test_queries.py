@@ -6,7 +6,7 @@ def test_persistence(reset_datastore, query_model_instance):
     retrieved = QueryTestModel.get(stored.key)
 
     assert retrieved is not None
-    assert stored.id == retrieved.id
+    assert stored.key.id == retrieved.key.id
     assert stored.name == retrieved.name
     assert stored.age == retrieved.age
 
