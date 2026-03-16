@@ -321,3 +321,54 @@ def test_populate_unknown_property():
 
     with pytest.raises(AttributeError, match="Unknown property: invalid_field"):
         instance.populate(invalid_field="Value")
+
+
+def test_put_exclude_from_indexes_emulator(reset_datastore):
+    """Ensure put() correctly merges schema-level and instance-level index exclusions in Datastore."""
+
+    class IndexTestModel(Model):
+        __kind__ = "IndexTest"
+        normal = StringProperty()
+        always_unindexed = StringProperty(indexed=False)
+        dynamic_unindexed = StringProperty(name="dynamic_db_name")
+
+    assert frozenset(["always_unindexed"]) == IndexTestModel._unindexed_datastore_names
+
+    client = get_client()
+
+    instance = IndexTestModel(
+        normal="A",
+        always_unindexed="B",
+        dynamic_unindexed="C"
+    )
+
+    instance.put(exclude_from_indexes=["dynamic_unindexed"])
+
+    raw_entity = client.get(instance.key)
+    assert raw_entity is not None
+
+    exclusions = raw_entity.exclude_from_indexes
+    assert "always_unindexed" in exclusions
+    assert "dynamic_db_name" in exclusions
+    assert "normal" not in exclusions
+
+    instance.put(exclude_from_indexes=["dynamic_db_name"])
+
+    raw_entity = client.get(instance.key)
+    assert raw_entity is not None
+
+    exclusions = raw_entity.exclude_from_indexes
+    assert "always_unindexed" in exclusions
+    assert "dynamic_db_name" in exclusions
+    assert "normal" not in exclusions
+
+    instance.put(exclude_from_indexes=["dynamic_unindexed", "normal", "random_field_no_property_no_alias"])
+
+    raw_entity = client.get(instance.key)
+    assert raw_entity is not None
+
+    exclusions = raw_entity.exclude_from_indexes
+    assert "always_unindexed" in exclusions
+    assert "dynamic_db_name" in exclusions
+    assert "normal" in exclusions
+    assert "random_field_no_property_no_alias" not in exclusions

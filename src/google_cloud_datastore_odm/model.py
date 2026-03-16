@@ -95,10 +95,16 @@ class ModelMeta(type):
         if not isinstance(datastore_kind, str):
             raise TypeError("__kind__ must be a string")
 
+        unindexed = set()
+        for py_name, prop in collected_properties.items():
+            if not prop.indexed:
+                unindexed.add(prop.datastore_name or py_name)
+
         class_attrs["_properties"] = collected_properties
         class_attrs["_model_validators"] = collected_validators
         class_attrs["_field_validators"] = dict(collected_field_validators)
         class_attrs["_kind"] = datastore_kind
+        class_attrs["_unindexed_datastore_names"] = frozenset(unindexed)
 
         return super().__new__(mcs, class_name, base_classes, class_attrs)
 
@@ -117,6 +123,7 @@ class Model(metaclass=ModelMeta):
     _model_validators: ClassVar[List[Callable]] = []
     _field_validators: ClassVar[Dict[str, List[str]]] = {}
     _kind: ClassVar[str]
+    _unindexed_datastore_names: ClassVar[frozenset[str]] = frozenset()
 
     key: Optional[datastore.Key] = None
 
@@ -319,17 +326,25 @@ class Model(metaclass=ModelMeta):
         """Create a query object for this model."""
         return Query(cls)
 
-    def put(self):
+    def put(self, exclude_from_indexes: Optional[List[str]] = None):
         """
         Persist the model instance to datastore.
+        Args:
+            exclude_from_indexes: Optional list of Python property names to
+                                  dynamically exclude from Datastore indexes for this specific write.
         """
         self.validate()
         self._ensure_key()
         client = self._client()
 
-        unindexed_names = [
-            prop.datastore_name for prop in self._properties.values() if not prop.indexed
-        ]
+        unindexed_names = set(self._unindexed_datastore_names)
+
+        if exclude_from_indexes:
+            for name in exclude_from_indexes:
+                if name in self._properties:
+                    unindexed_names.add(self._properties[name].datastore_name)
+                else:
+                    unindexed_names.add(name)
 
         entity = datastore.Entity(
             key=self.key,
