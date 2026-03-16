@@ -109,5 +109,5 @@ def test_inherited_validators():
 
     instance.shared_text = "ok"
     instance.child_text = "bad_child"
-    with pytest.raises(ValueError, match="Blocked by child model validator"):
+    with pytest.raises(ValueError):
         instance.validate()

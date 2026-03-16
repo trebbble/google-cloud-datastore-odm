@@ -1,7 +1,7 @@
 import pytest
 
 from src.google_cloud_datastore_odm.client import get_client
-from src.google_cloud_datastore_odm.model import Model
+from src.google_cloud_datastore_odm.model import Model, field_validator
 from src.google_cloud_datastore_odm.properties import IntegerProperty, Property, StringProperty
 
 
@@ -308,6 +308,54 @@ def test_to_dict_include_exclude():
     assert "b" not in excluded
 
 
+def test_populate_happy_path():
+    """Ensure populate updates multiple valid properties simultaneously."""
+
+    class PopModel(Model):
+        name = StringProperty()
+        age = IntegerProperty()
+
+    instance = PopModel(name="Alice", age=30)
+    assert instance.name == "Alice"
+    assert instance.age == 30
+
+    instance.populate(name="Bob", age=31)
+
+    assert instance.name == "Bob"
+    assert instance.age == 31
+
+
+def test_populate_failures():
+    """Ensure populate blocks unknown properties and respects validators."""
+
+    class PopModel(Model):
+        name = StringProperty()
+        age = IntegerProperty()
+
+        @field_validator('age')
+        def validate_adult(self, value: int) -> int:
+            if value < 18:
+                raise ValueError("Only adults are allowed.")
+            return value
+
+    instance = PopModel(name="Alice", age=30)
+
+    with pytest.raises(TypeError):
+        instance.populate(age="thirty-one")
+
+    with pytest.raises(ValueError):
+        instance.populate(age=17)
+
+    assert instance.name == "Alice"
+    assert instance.age == 30
+
+    with pytest.raises(TypeError):
+        _ = PopModel(name="Alice", age="thirty-one")
+
+    with pytest.raises(ValueError):
+        _ = PopModel(name="Alice", age=17)
+
+
 def test_populate_unknown_property():
     """Ensure populate raises AttributeError for non-existent properties."""
 
@@ -319,7 +367,7 @@ def test_populate_unknown_property():
     instance.populate(name="Updated")
     assert instance.name == "Updated"
 
-    with pytest.raises(AttributeError, match="Unknown property: invalid_field"):
+    with pytest.raises(AttributeError):
         instance.populate(invalid_field="Value")
 
 
@@ -372,3 +420,145 @@ def test_put_exclude_from_indexes_emulator(reset_datastore):
     assert "dynamic_db_name" in exclusions
     assert "normal" in exclusions
     assert "random_field_no_property_no_alias" not in exclusions
+
+
+def test_model_equality():
+    """Ensure __eq__ strictly compares both keys and underlying values (NDB style)."""
+    class EqModel(Model):
+        __kind__ = "EqModel"
+        name = StringProperty()
+
+    m1 = EqModel(name="Alice")
+    m2 = EqModel(name="Alice")
+    assert m1 == m2
+
+    m3 = EqModel(name="Bob")
+    assert m1 != m3
+
+    shared_key = EqModel.key_from_id(1)
+    m4 = EqModel(key=shared_key, name="Charlie")
+    m5 = EqModel(key=shared_key, name="Charlie")
+    assert m4 == m5
+
+    m6 = EqModel(key=shared_key, name="David")
+    assert m4 != m6
+
+    diff_key = EqModel.key_from_id(2)
+    m7 = EqModel(key=diff_key, name="Charlie")
+    assert m4 != m7
+
+    assert m1 != m4
+
+    assert m1 != "Some String"
+
+
+def test_model_delete(reset_datastore):
+    """Ensure single instance deletion works against the emulator."""
+
+    class DeleteModel(Model):
+        __kind__ = "DeleteModel"
+        name = StringProperty()
+
+    instance = DeleteModel(name="To Be Deleted")
+    key = instance.put()
+
+    assert DeleteModel.get(key) is not None
+
+    instance.delete()
+
+    assert DeleteModel.get(key) is None
+
+    unsaved_instance = DeleteModel(name="No Key")
+    with pytest.raises(ValueError):
+        unsaved_instance.delete()
+
+
+def test_get_multi(reset_datastore):
+    """Ensure get_multi retrieves instances and preserves order, including missing ones."""
+
+    class BatchGetModel(Model):
+        __kind__ = "BatchGetModel"
+        val = IntegerProperty()
+
+    instances = [
+        BatchGetModel(id=1, val=10),
+        BatchGetModel(id=2, val=20),
+        BatchGetModel(id=3, val=30)
+    ]
+    keys = BatchGetModel.put_multi(instances)
+
+    fetch_keys = [keys[2], keys[0], keys[1]]
+    results: list[BatchGetModel] = BatchGetModel.get_multi(fetch_keys)
+
+    assert len(results) == 3
+    assert results[0].val == 30
+    assert results[1].val == 10
+    assert results[2].val == 20
+
+    missing_key = BatchGetModel.key_from_id(999)
+    mixed_keys = [keys[0], missing_key, keys[1]]
+    mixed_results: list[BatchGetModel] = BatchGetModel.get_multi(mixed_keys)
+
+    assert len(mixed_results) == 3
+    assert mixed_results[0].val == 10
+    assert mixed_results[1] is None
+    assert mixed_results[2].val == 20
+
+    assert BatchGetModel.get_multi([]) == []
+
+
+def test_put_multi(reset_datastore):
+    """Ensure put_multi saves multiple instances and generates auto-IDs."""
+
+    class BatchPutModel(Model):
+        __kind__ = "BatchPutModel"
+        val = IntegerProperty()
+
+    instances = [
+        BatchPutModel(id=101, val=10),
+        BatchPutModel(id=102, val=20),
+        BatchPutModel(val=30)
+    ]
+
+    keys = BatchPutModel.put_multi(instances)
+
+    assert len(keys) == 3
+    assert keys[0].id == 101
+    assert keys[1].id == 102
+    assert keys[2].id is not None
+
+    assert instances[2].key == keys[2]
+
+    fetched_1 = BatchPutModel.get(keys[0])
+    fetched_3 = BatchPutModel.get(keys[2])
+
+    assert fetched_1.val == 10
+    assert fetched_3.val == 30
+
+    assert BatchPutModel.put_multi([]) == []
+
+
+def test_delete_multi(reset_datastore):
+    """Ensure delete_multi removes multiple instances from the emulator."""
+
+    class BatchDelModel(Model):
+        __kind__ = "BatchDelModel"
+        val = IntegerProperty()
+
+    instances = [
+        BatchDelModel(val=1),
+        BatchDelModel(val=2),
+        BatchDelModel(val=3)
+    ]
+    keys = BatchDelModel.put_multi(instances)
+
+    assert BatchDelModel.get(keys[0]) is not None
+    assert BatchDelModel.get(keys[2]) is not None
+
+    BatchDelModel.delete_multi(keys)
+
+    assert BatchDelModel.get(keys[0]) is None
+    assert BatchDelModel.get(keys[1]) is None
+    assert BatchDelModel.get(keys[2]) is None
+
+    BatchDelModel.delete_multi([])

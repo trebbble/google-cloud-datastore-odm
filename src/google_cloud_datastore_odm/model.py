@@ -187,6 +187,16 @@ class Model(metaclass=ModelMeta):
             key_part = f" id={self.key.id_or_name!r}"
         return f"<{self.__class__.__name__}{key_part} {property_repr}>"
 
+    def __eq__(self, other: Any) -> bool:
+        """Compare two entities for equality."""
+        if not isinstance(other, self.__class__):
+            return NotImplemented
+
+        if self.key != other.key:
+            return False
+
+        return self._values == other._values
+
     def __getitem__(self, key: str) -> Any:
         return self._values[key]
 
@@ -310,6 +320,32 @@ class Model(metaclass=ModelMeta):
         """Construct a datastore Key for this model's kind."""
         return cls._client().key(cls._kind, identifier, parent=parent)
 
+    def populate(self, **kwargs: Any) -> None:
+        """
+        Update multiple properties at once.
+        Triggers all field validators during assignment.
+        """
+        for key, value in kwargs.items():
+            if key in self._properties:
+                setattr(self, key, value)
+            else:
+                raise AttributeError(f"Unknown property: {key}")
+
+    @classmethod
+    def from_entity(cls, entity: Optional[datastore.Entity]):
+        """Create a model instance from a datastore Entity."""
+        if entity is None:
+            return None
+
+        kwargs = {}
+
+        for py_name, prop in cls._properties.items():
+            if prop.datastore_name in entity:
+                kwargs[py_name] = entity[prop.datastore_name]
+
+        instance = cls(key=entity.key, **kwargs)
+        return instance
+
     @classmethod
     def get(cls, key: datastore.Key):
         """Fetch an entity by its datastore key and hydrate a model instance."""
@@ -358,30 +394,76 @@ class Model(metaclass=ModelMeta):
                 entity[prop.datastore_name] = value
 
         client.put(entity)
-        return self
+        self.key = entity.key
+        return self.key
 
-    def populate(self, **kwargs: Any) -> None:
+    def delete(self) -> None:
         """
-        Update multiple properties at once.
-        Triggers all field validators during assignment.
+        Delete the model instance from the Datastore.
         """
-        for key, value in kwargs.items():
-            if key in self._properties:
-                setattr(self, key, value)
-            else:
-                raise AttributeError(f"Unknown property: {key}")
+        if self.key is None:
+            raise ValueError("Cannot delete an entity that does not have a key.")
+        self._client().delete(self.key)
 
     @classmethod
-    def from_entity(cls, entity: Optional[datastore.Entity]):
-        """Create a model instance from a datastore Entity."""
-        if entity is None:
-            return None
+    def get_multi(cls, keys: List[datastore.Key]) -> List[Optional["Model"]]:
+        """
+        Fetch multiple entities by their keys.
+        Returns a list of model instances (or None for missing keys)
+        in the exact order of the provided keys.
+        """
+        if not keys:
+            return []
 
-        kwargs = {}
+        client = cls._client()
+        entities = client.get_multi(keys)
+        entity_map = {e.key: e for e in entities}
 
-        for py_name, prop in cls._properties.items():
-            if prop.datastore_name in entity:
-                kwargs[py_name] = entity[prop.datastore_name]
+        return [cls.from_entity(entity_map.get(k)) for k in keys]
 
-        instance = cls(key=entity.key, **kwargs)
-        return instance
+    @classmethod
+    def put_multi(cls, instances: List["Model"]) -> List[datastore.Key]:
+        """
+        Persist multiple model instances in a single batch Datastore operation.
+        """
+        if not instances:
+            return []
+
+        client = cls._client()
+        entities_to_put = []
+
+        # Use the pre-computed schema-level index exclusions for maximum speed
+        unindexed_names = tuple(cls._unindexed_datastore_names)
+
+        for instance in instances:
+            instance.validate()
+            instance._ensure_key()
+
+            entity = datastore.Entity(
+                key=instance.key,
+                exclude_from_indexes=unindexed_names
+            )
+
+            for py_name, prop in cls._properties.items():
+                value = instance._values.get(py_name)
+                if value is not None:
+                    entity[prop.datastore_name] = value
+
+            entities_to_put.append(entity)
+
+        client.put_multi(entities_to_put)
+
+        for instance, entity in zip(instances, entities_to_put):
+            instance.key = entity.key
+
+        return [instance.key for instance in instances]
+
+    @classmethod
+    def delete_multi(cls, keys: List[datastore.Key]) -> None:
+        """
+        Delete multiple entities by their keys in a single batch Datastore operation.
+        """
+        if not keys:
+            return
+
+        cls._client().delete_multi(keys)

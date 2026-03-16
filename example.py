@@ -175,9 +175,10 @@ print("to_dict():", article.to_dict())
 # ---------------------------------------------------------------------------
 
 print("\n--- Persistence ---")
-saved_article = article.put()
-print(f"Saved article: {saved_article}")
-print(f"Key: {saved_article.key}")
+saved_article_key = article.put()
+print(f"Saved article: {article}")
+print(f"Key: {saved_article_key}")
+print(f"Key: {article.key}")
 
 
 # ---------------------------------------------------------------------------
@@ -185,7 +186,7 @@ print(f"Key: {saved_article.key}")
 # ---------------------------------------------------------------------------
 
 print("\n--- Fetching by Key ---")
-fetched = Article.get(key=saved_article.key)
+fetched = Article.get(key=saved_article_key)
 print(f"Fetched: {fetched}")
 print(f"Fetched ID: {fetched.key.id_or_name}")
 print(f"Fetched Tags (Repeated): {fetched.tags}")
@@ -203,7 +204,20 @@ print(f"Fetched by explicit ID: {fetched_by_id}")
 
 
 # ---------------------------------------------------------------------------
-# 11. Query passthrough (.query().filter().fetch())
+# 11. Equality checks (__eq__)
+# ---------------------------------------------------------------------------
+
+print("\n--- Equality ---")
+# Because fetched_by_id and article have the exact same Key and underlying data:
+print(f"Is 'fetched_by_id' equal to 'article'? {fetched_by_id == article}")
+
+# NDB-strictness: Even with the same key, if memory state changes, they are not equal.
+fetched_by_id.title = "A New Title in Memory"
+print(f"Are they equal after modifying one's title? {fetched_by_id == article}")
+
+
+# ---------------------------------------------------------------------------
+# 12. Query passthrough (.query().filter().fetch())
 # ---------------------------------------------------------------------------
 
 print("\n--- Queries ---")
@@ -224,19 +238,49 @@ print(f"First 2 articles (limited): {len(results_limited)} returned")
 
 
 # ---------------------------------------------------------------------------
-# 12. Explicit key allocation (.allocate_key)
+# 13. Batch Operations (put_multi, get_multi, delete_multi)
+# ---------------------------------------------------------------------------
+
+print("\n--- Batch Operations & Deletion ---")
+batch_articles = [
+    Article(title="Batch Article 1", author="System", word_count=100),
+    Article(title="Batch Article 2", author="System", word_count=200),
+    Article(title="Batch Article 3", author="System", word_count=300),
+]
+
+# put_multi performs a single RPC call
+batch_keys = Article.put_multi(batch_articles)
+print(f"Saved {len(batch_keys)} articles using put_multi.")
+
+# get_multi retrieves instances in the exact order requested
+fetched_batch = Article.get_multi(batch_keys)
+print(f"Fetched {len(fetched_batch)} articles using get_multi.")
+print(f"First fetched from batch: {fetched_batch[0].title}")
+
+# Single instance delete
+first_batch_article = fetched_batch[0]
+first_batch_article.delete()
+print(f"Deleted single article with ID: {first_batch_article.key.id_or_name}")
+
+# delete_multi performs a single RPC call for the rest
+remaining_keys = batch_keys[1:]
+Article.delete_multi(remaining_keys)
+print(f"Deleted remaining {len(remaining_keys)} articles using delete_multi.")
+
+# ---------------------------------------------------------------------------
+# 14. Explicit key allocation (.allocate_key)
 # ---------------------------------------------------------------------------
 
 print("\n--- Key Allocation ---")
 draft = Article(title="Unfinished Draft", author="Carol", status="draft", word_count=50)
 draft.allocate_key()
 print(f"Allocated key before put: {draft.key}")
-draft.put()
-print(f"After put key: {draft.key}, ID: {draft.key.id_or_name}")
+draft_key = draft.put()
+print(f"After put key: {draft.key}, Returned key: {draft_key}, ID: {draft.key.id_or_name}")
 
 
 # ---------------------------------------------------------------------------
-# 13. Model kind introspection
+# 15. Model kind introspection
 # ---------------------------------------------------------------------------
 
 print("\n--- Introspection ---")
@@ -250,7 +294,7 @@ print(f"Article properties aliases: {json.dumps(Article.get_schema(output_format
 
 
 # ---------------------------------------------------------------------------
-# 14. Validation errors
+# 16. Validation errors
 # ---------------------------------------------------------------------------
 
 print("\n--- Validation Examples ---")

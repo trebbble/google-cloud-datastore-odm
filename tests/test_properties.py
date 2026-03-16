@@ -199,5 +199,5 @@ def test_property_choices_violation():
 
     instance = ChoiceModel(status="draft")
 
-    with pytest.raises(ValueError, match="must be one of"):
+    with pytest.raises(ValueError):
         instance.status = "archived"

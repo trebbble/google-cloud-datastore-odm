@@ -2,13 +2,13 @@ from tests.conftest import QueryTestModel
 
 
 def test_persistence(reset_datastore, query_model_instance):
-    stored = query_model_instance.put()
-    retrieved = QueryTestModel.get(stored.key)
+    stored_key = query_model_instance.put()
+    retrieved = QueryTestModel.get(stored_key)
 
     assert retrieved is not None
-    assert stored.key.id == retrieved.key.id
-    assert stored.name == retrieved.name
-    assert stored.age == retrieved.age
+    assert stored_key.id == retrieved.key.id
+    assert query_model_instance.name == retrieved.name
+    assert query_model_instance.age == retrieved.age
 
 
 def test_query_filter_single(reset_datastore, query_model_instance):
