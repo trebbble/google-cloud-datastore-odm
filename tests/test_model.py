@@ -2,7 +2,7 @@ import pytest
 
 from src.google_cloud_datastore_odm.client import get_client
 from src.google_cloud_datastore_odm.model import Model
-from src.google_cloud_datastore_odm.properties import Property, StringProperty, IntegerProperty
+from src.google_cloud_datastore_odm.properties import IntegerProperty, Property, StringProperty
 
 
 class KeyTestModel(Model):
