@@ -1,3 +1,11 @@
+"""
+Property descriptors for the Google Cloud Datastore ODM.
+
+This module provides the base `Property` descriptor and its type-specific subclasses
+(e.g., `StringProperty`, `IntegerProperty`). These classes handle data coercion,
+validation, default values, and Datastore schema mapping.
+"""
+
 from typing import TYPE_CHECKING, Any, Callable, List, Optional
 
 if TYPE_CHECKING:
@@ -5,18 +13,20 @@ if TYPE_CHECKING:
 
 
 class Property:
-    """
-    Base descriptor for model properties.
+    """Base descriptor for model properties.
+
+    This class implements the Python descriptor protocol (`__get__`, `__set__`, `__delete__`)
+    to manage state on the underlying `Model` instances.
 
     Responsibilities:
-    - Required checks
-    - Python type enforcement
-    - Property-level validators
-    - Model-level field validators
-    - Datastore aliasing (name)
-    - Indexing control (indexed)
-    - List support (repeated)
-    - Value restriction (choices)
+    - Required checks and default value assignment
+    - Python type enforcement (via subclasses)
+    - Inline property-level validators
+    - Routing to Model-level `@field_validator` methods
+    - Datastore aliasing (`name`)
+    - Indexing control (`indexed`)
+    - List support (`repeated`)
+    - Value restriction (`choices`)
     """
 
     def __init__(
@@ -30,6 +40,38 @@ class Property:
             choices: Optional[list] = None,
             validators: Optional[List[Callable]] = None,
     ):
+        """Initialize a new Property.
+
+        Args:
+            name (Optional[str]): The Datastore column name. If omitted, defaults to 
+                the Python attribute name. Useful for mapping legacy database fields.
+            indexed (bool): Whether the Datastore should index this property. Set to 
+                False for massive text blocks to save space and reduce write costs. If not sure leave this True
+                and pass unindexed properties on the fly during put() operations.
+            repeated (bool): If True, this property expects an iterable (list/set/tuple) 
+                and stores it as an array in Datastore. Defaults to False.
+            required (bool): If True, assigning `None` or an empty list (if repeated) 
+                will raise a ValueError. Defaults to False.
+            default (Any): The default value or a zero-argument callable to generate one 
+                (e.g., `default=list` or `default=datetime.now`).
+            choices (Optional[list]): An optional list of allowed values. Assignments 
+                not in this list will raise a ValueError.
+            validators (Optional[List[Callable]]): A list of custom validation functions.
+                Each function should accept a single value, validate/mutate it, and return it.
+
+        Raises:
+            TypeError: If any provided validator is not callable.
+
+        Example:
+            ```python
+            status = StringProperty(
+                default="draft",
+                choices=["draft", "published"],
+                name="legacy_status_col"
+            )
+            tags = StringProperty(repeated=True)
+            ```
+        """
         self.datastore_name = name
         self.indexed = indexed
         self.repeated = repeated
@@ -46,18 +88,50 @@ class Property:
             if not callable(validator):
                 raise TypeError(f"Validator {validator} for property '{self}' is not callable")
 
-    def __set_name__(self, owner, name: str):
-        """Called by Python to set the attribute name on the owner class."""
+    def __set_name__(self, owner: type, name: str) -> None:
+        """Called automatically by Python to set the attribute name.
+
+        Args:
+            owner (type): The class that owns this descriptor.
+            name (str): The name of the attribute on the class.
+        """
         self._python_name = name
         if not self.datastore_name:
             self.datastore_name = name
 
     def _validate_type(self, value: Any) -> Any:
-        """Override in subclasses to enforce Python types."""
+        """Enforce Python types. 
+
+        This method should be overridden by subclasses (e.g., `StringProperty`).
+
+        Args:
+            value (Any): The value to type-check.
+
+        Returns:
+            Any: The type-cast or verified value.
+        """
         return value
 
     def _validate_single_value(self, instance: "Model", value: Any) -> Any:
-        """Validates a single item (used directly, or mapped over a list if repeated=True)"""
+        """Validate a single item through the full validation pipeline.
+
+        The pipeline executes in this exact order:
+        1. Type validation (`_validate_type`)
+        2. Choices restriction (`choices`)
+        3. Inline property validators (`validators=[...]`)
+        4. Model-level field validators (`@field_validator('prop')`)
+
+        Args:
+            instance (Model): The model instance this property is attached to.
+            value (Any): The specific value to validate.
+
+        Raises:
+            ValueError: If the value violates choices or a custom validation rule.
+            TypeError: If the value violates the property's type constraint.
+
+        Returns:
+            Any: The fully validated and potentially coerced value.
+        """
         value = self._validate_type(value)
 
         if self.choices is not None and value not in self.choices:
@@ -74,8 +148,21 @@ class Property:
         return value
 
     def validate(self, instance: "Model", value: Any) -> Any:
-        """
-        Validate and process a value for this property.
+        """Validate and process a value (or list of values) for this property.
+
+        Handles `None` assignments, required checks, and maps the validation 
+        pipeline over elements if the property is `repeated`.
+
+        Args:
+            instance (Model): The underlying model instance.
+            value (Any): The assigned value (or iterable if repeated).
+
+        Raises:
+            ValueError: If the property is required but None/empty is provided.
+            TypeError: If a repeated property is assigned a non-iterable.
+
+        Returns:
+            Any: The fully validated value or list of validated values.
         """
         if value is None:
             if self.required:
@@ -98,30 +185,67 @@ class Property:
         else:
             return self._validate_single_value(instance, value)
 
-    def __get__(self, instance: Optional["Model"], owner):
+    def __get__(self, instance: Optional["Model"], owner: type) -> Any:
+        """Retrieve the property value from the model instance's internal dictionary.
+
+        If accessed on the class itself, returns the Property descriptor instance.
+        """
         if instance is None:
             return self
         # noinspection PyProtectedMember
         return instance._values.get(self._python_name, self.default)
 
-    def __set__(self, instance: "Model", value):
+    def __set__(self, instance: "Model", value: Any) -> None:
+        """Validate and store the property value in the model instance's internal dictionary."""
         # noinspection PyProtectedMember
         instance._values[self._python_name] = self.validate(instance, value)
 
-    def __delete__(self, instance: "Model"):
+    def __delete__(self, instance: "Model") -> None:
+        """Remove the property value from the model instance's internal dictionary."""
         # noinspection PyProtectedMember
         instance._values.pop(self._python_name, None)
 
 
 class StringProperty(Property):
+    """A Datastore property that strictly enforces string values."""
+
     def _validate_type(self, value: Any) -> Any:
+        """Enforce that the value is a string.
+
+        Args:
+            value (Any): The value to check.
+
+        Raises:
+            TypeError: If the value is not an instance of `str`.
+
+        Returns:
+            str: The validated string.
+        """
         if not isinstance(value, str):
             raise TypeError(f"Property '{self._python_name}' must be str")
         return value
 
 
 class IntegerProperty(Property):
+    """A Datastore property that strictly enforces integer values.
+
+    Note: Python evaluates booleans as subclasses of integers (`isinstance(True, int)` 
+    is True). This descriptor explicitly rejects boolean values to maintain strict 
+    Datastore type integrity.
+    """
+
     def _validate_type(self, value: Any) -> Any:
+        """Enforce that the value is an integer and NOT a boolean.
+
+        Args:
+            value (Any): The value to check.
+
+        Raises:
+            TypeError: If the value is not an integer, or if it is a boolean.
+
+        Returns:
+            int: The validated integer.
+        """
         if not isinstance(value, int) or isinstance(value, bool):
             raise TypeError(f"Property '{self._python_name}' must be int")
         return value

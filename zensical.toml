@@ -1,0 +1,52 @@
+[project]
+site_name = "Google Cloud Datastore ODM"
+site_description = "A modern, strictly-typed ODM for Google Cloud Datastore."
+repo_url = "https://github.com/trebbble/google-cloud-datastore-odm"
+
+nav = [
+    { "Home" = "index.md" },
+    { "Getting Started" = "getting_started.md" },
+    { "API Reference" = [
+        { "Client" = "api/client.md" },
+        { "Model" = "api/model.md" },
+        { "Properties" = "api/properties.md" },
+        { "Query" = "api/query.md" }
+    ]}
+]
+
+[project.theme]
+variant = "modern"
+features = [
+    "navigation.tabs",
+    "navigation.indexes",
+    "search.suggest",
+    "search.highlight",
+    "content.code.copy"
+]
+
+# Light Mode configuration
+[[project.theme.palette]]
+media = "(prefers-color-scheme: light)"
+scheme = "default"
+toggle.icon = "material/brightness-7"
+toggle.name = "Switch to dark mode"
+
+# Dark Mode configuration
+[[project.theme.palette]]
+media = "(prefers-color-scheme: dark)"
+scheme = "slate"
+toggle.icon = "material/brightness-4"
+toggle.name = "Switch to light mode"
+
+# Initialize Search plugin
+[project.plugins.search]
+
+# Configure mkdocstrings for Zensical
+[project.plugins.mkdocstrings.handlers.python]
+paths = ["src"]
+inventories = ["https://docs.python.org/3/objects.inv"]
+
+[project.plugins.mkdocstrings.handlers.python.options]
+docstring_style = "google"
+inherited_members = true
+show_source = false

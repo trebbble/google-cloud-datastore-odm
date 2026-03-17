@@ -1,4 +1,8 @@
-from .model import Model as Model
+from .model import (
+    Model as Model,
+    field_validator as field_validator,
+    model_validator as model_validator,
+)
 from .properties import (
     IntegerProperty as IntegerProperty,
 )
@@ -11,6 +15,8 @@ from .properties import (
 
 __all__ = [
     "Model",
+    "field_validator",
+    "model_validator",
     "Property",
     "StringProperty",
     "IntegerProperty",

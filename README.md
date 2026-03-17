@@ -27,6 +27,10 @@
 - Run linter `uv run ruff check`
 
 
+### Local docs:
+- `uv run zensical serve`
+- Visit at http://localhost:8000
+
 ## Roadmap
 
 ### Core Model & Property System
