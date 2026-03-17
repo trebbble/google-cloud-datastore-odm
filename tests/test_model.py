@@ -649,3 +649,70 @@ def test_ensure_key_no_rpc():
     original_key = m.key
     m._ensure_key()
     assert m.key is original_key
+
+
+def test_lifecycle_hooks(reset_datastore):
+    """Ensure all lifecycle hooks fire in the correct order for single and batch operations."""
+
+    class HookModel(Model):
+        __kind__ = "HookModel"
+        name = StringProperty()
+
+        history = []
+
+        def _pre_put_hook(self):
+            self.history.append("pre_put")
+
+        def _post_put_hook(self):
+            self.history.append("post_put")
+
+        @classmethod
+        def _pre_get_hook(cls, entity_key):
+            cls.history.append("pre_get")
+
+        @classmethod
+        def _post_get_hook(cls, entity_key, instance):
+            assert instance is None or isinstance(instance, HookModel)
+            cls.history.append("post_get")
+
+        @classmethod
+        def _pre_delete_hook(cls, entity_key):
+            cls.history.append("pre_delete")
+
+        @classmethod
+        def _post_delete_hook(cls, entity_key):
+            cls.history.append("post_delete")
+
+    HookModel.history.clear()
+
+    m = HookModel(name="Alice")
+    key = m.put()
+    assert HookModel.history == ["pre_put", "post_put"]
+
+    HookModel.history.clear()
+    fetched = HookModel.get(key)
+    assert HookModel.history == ["pre_get", "post_get"]
+
+    HookModel.history.clear()
+    missing_key = HookModel.key_from_id(999)
+    HookModel.get(missing_key)
+
+    assert HookModel.history == ["pre_get", "post_get"]
+
+    HookModel.history.clear()
+    fetched.delete()
+    assert HookModel.history == ["pre_delete", "post_delete"]
+
+    HookModel.history.clear()
+    m1 = HookModel(name="Bob")
+    m2 = HookModel(name="Charlie")
+    keys = HookModel.put_multi([m1, m2])
+    assert HookModel.history == ["pre_put", "pre_put", "post_put", "post_put"]
+
+    HookModel.history.clear()
+    HookModel.get_multi(keys)
+    assert HookModel.history == ["pre_get", "pre_get", "post_get", "post_get"]
+
+    HookModel.history.clear()
+    HookModel.delete_multi(keys)
+    assert HookModel.history == ["pre_delete", "pre_delete", "post_delete", "post_delete"]

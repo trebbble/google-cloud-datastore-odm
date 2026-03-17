@@ -373,10 +373,43 @@ class Model(metaclass=ModelMeta):
         return instance
 
     @classmethod
+    def _pre_get_hook(cls, key: datastore.Key) -> None:
+        """Runs just before a read request is sent to the Datastore."""
+        pass
+
+    @classmethod
+    def _post_get_hook(cls, key: datastore.Key, entity: datastore.Entity) -> None:
+        """Runs immediately after an entity is fetched and hydrated into a Python object."""
+        pass
+
+    def _pre_put_hook(self) -> None:
+        """Runs just before the entity is sent to the Datastore."""
+        pass
+
+    def _post_put_hook(self) -> None:
+        """Runs immediately after the entity successfully saves and receives its key."""
+        pass
+
+    @classmethod
+    def _pre_delete_hook(cls, key: datastore.Key) -> None:
+        """Runs just before the delete request is sent to the Datastore."""
+        pass
+
+    @classmethod
+    def _post_delete_hook(cls, key: datastore.Key) -> None:
+        """Runs immediately after the delete request succeeds."""
+        pass
+
+    @classmethod
     def get(cls, key: datastore.Key):
         """Fetch an entity by its datastore key and hydrate a model instance."""
+        cls._pre_get_hook(key)
         entity = cls._client().get(key)
-        return cls.from_entity(entity) if entity else None
+
+        instance = cls.from_entity(entity) if entity else None
+        cls._post_get_hook(key, instance)
+
+        return instance
 
     @classmethod
     def get_by_id(cls, identifier: Any, parent: Optional[datastore.Key] = None):
@@ -397,6 +430,8 @@ class Model(metaclass=ModelMeta):
         """
         self.validate()
         self._ensure_key()
+        self._pre_put_hook()
+
         client = self._client()
 
         unindexed_names = set(self._unindexed_datastore_names)
@@ -421,6 +456,9 @@ class Model(metaclass=ModelMeta):
 
         client.put(entity)
         self.key = entity.key
+
+        self._post_put_hook()
+
         return self.key
 
     def delete(self) -> None:
@@ -429,7 +467,10 @@ class Model(metaclass=ModelMeta):
         """
         if self.key is None:
             raise ValueError("Cannot delete an entity that does not have a key.")
+
+        self._pre_delete_hook(self.key)
         self._client().delete(self.key)
+        self._post_delete_hook(self.key)
 
     @classmethod
     def get_multi(cls, keys: List[datastore.Key]) -> List[Optional["Model"]]:
@@ -441,11 +482,20 @@ class Model(metaclass=ModelMeta):
         if not keys:
             return []
 
+        for key in keys:
+            cls._pre_get_hook(key)
+
         client = cls._client()
         entities = client.get_multi(keys)
         entity_map = {e.key: e for e in entities}
 
-        return [cls.from_entity(entity_map.get(k)) for k in keys]
+        instances = []
+        for key in keys:
+            instance = cls.from_entity(entity_map.get(key))
+            cls._post_get_hook(key, instance)
+            instances.append(instance)
+
+        return instances
 
     @classmethod
     def put_multi(cls, instances: List["Model"]) -> List[datastore.Key]:
@@ -464,6 +514,7 @@ class Model(metaclass=ModelMeta):
         for instance in instances:
             instance.validate()
             instance._ensure_key()
+            instance._pre_put_hook()
 
             entity = datastore.Entity(
                 key=instance.key,
@@ -481,6 +532,7 @@ class Model(metaclass=ModelMeta):
 
         for instance, entity in zip(instances, entities_to_put):
             instance.key = entity.key
+            instance._post_put_hook()
 
         return [instance.key for instance in instances]
 
@@ -492,4 +544,10 @@ class Model(metaclass=ModelMeta):
         if not keys:
             return
 
+        for key in keys:
+            cls._pre_delete_hook(key)
+
         cls._client().delete_multi(keys)
+
+        for key in keys:
+            cls._post_delete_hook(key)
