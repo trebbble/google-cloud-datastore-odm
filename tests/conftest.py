@@ -37,7 +37,7 @@ def datastore_client():
     return get_client()
 
 
-@pytest.fixture
+@pytest.fixture(autouse=True)
 def reset_datastore():
     """
     Reset the Datastore emulator before a test.

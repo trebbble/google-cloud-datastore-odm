@@ -267,16 +267,25 @@ remaining_keys = batch_keys[1:]
 Article.delete_multi(remaining_keys)
 print(f"Deleted remaining {len(remaining_keys)} articles using delete_multi.")
 
+
 # ---------------------------------------------------------------------------
-# 14. Explicit key allocation (.allocate_key)
+# 14. Explicit key allocation (.allocate_key, .allocate_ids, .has_complete_key)
 # ---------------------------------------------------------------------------
 
 print("\n--- Key Allocation ---")
 draft = Article(title="Unfinished Draft", author="Carol", status="draft", word_count=50)
+print(f"Has complete key before allocation? {draft.has_complete_key}")
+
 draft.allocate_key()
+print(f"Has complete key after allocation? {draft.has_complete_key}")
 print(f"Allocated key before put: {draft.key}")
 draft_key = draft.put()
 print(f"After put key: {draft.key}, Returned key: {draft_key}, ID: {draft.key.id_or_name}")
+
+print("\nAllocating a batch of 5 IDs without creating instances yet:")
+reserved_keys = Article.allocate_ids(size=5)
+for k in reserved_keys:
+    print(f"  - Reserved ID: {k.id}")
 
 
 # ---------------------------------------------------------------------------
@@ -318,5 +327,51 @@ try:
     unpublishable.put()  # triggers model_validator at put time
 except ValueError as e:
     print(f"Caught model validator error: {e}")
+
+
+# ---------------------------------------------------------------------------
+# 17. Lifecycle Hooks
+# ---------------------------------------------------------------------------
+
+print("\n--- Lifecycle Hooks ---")
+
+
+class TrackedTask(Model):
+    __kind__ = "TrackedTask"
+    description = StringProperty()
+
+    def _pre_put_hook(self):
+        print(f"  [_pre_put] Preparing to save task: {self.description}")
+
+    def _post_put_hook(self):
+        print(f"  [_post_put] Successfully saved task with ID: {self.key.id_or_name}")
+
+    @classmethod
+    def _pre_get_hook(cls, key):
+        print(f"  [_pre_get] Preparing to fetch key: {key.id_or_name}")
+
+    @classmethod
+    def _post_get_hook(cls, key, instance):
+        print(f"  [_post_get] Fetched key: {key.id_or_name}. Found instance? {instance is not None}")
+
+    @classmethod
+    def _pre_delete_hook(cls, key):
+        print(f"  [_pre_delete] Preparing to delete key: {key.id_or_name}")
+
+    @classmethod
+    def _post_delete_hook(cls, key):
+        print(f"  [_post_delete] Successfully deleted key: {key.id_or_name}")
+
+
+print("Creating a task to trigger put hooks...")
+
+task = TrackedTask(description="Learn Python ODM Hooks")
+task_key = task.put()
+
+print("\nFetching the task to trigger get hooks...")
+fetched_task = TrackedTask.get(task_key)
+
+print("\nDeleting the task to trigger delete hooks...")
+fetched_task.delete()
 
 print("\nDone!")
