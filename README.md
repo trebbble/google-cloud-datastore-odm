@@ -29,47 +29,77 @@
 
 ## Roadmap
 
-### Core Model & Field System
-- [ ] Model base class
-  - [ ] Metaclass-driven configuration
-  - [ ] Model-level validation hooks
+### Core Model & Property System
+- [x] Model base class
+  - [x] Metaclass-driven configuration
+  - [x] Model-level validation hooks
   - [ ] Explicit model overrides via `Meta` class
     - [ ] `kind`
     - [ ] `namespace`
     - [ ] `project`
-- [ ] Field system
-  - [ ] Descriptor-based field definitions
-  - [ ] Field defaults
-  - [ ] Field-level validation
-- [ ] Datastore key handling
-  - [ ] Key allocation helpers
-  - [ ] Entity identity (`id` / `name`)
-  - [ ] Entity hydration from datastore
-  - [ ] Ancestor (hierarchical) key support
-- [ ] Dict-style and attribute-style access
+- [x] Property system
+  - [x] Descriptor-based field definitions
+  - [x] Field defaults
+  - [x] Field-level validation
+  - Properties:
+    - [ ] BooleanProperty
+    - [x] IntegerProperty
+    - [ ] FloatProperty
+    - [ ] BlobProperty
+    - [ ] CompressedTextProperty
+    - [ ] TextProperty
+    - [x] StringProperty
+    - [ ] GeoPtProperty
+    - [ ] PickleProperty
+    - [ ] JsonProperty
+    - [ ] UserProperty
+    - [ ] KeyProperty
+    - [ ] BlobKeyProperty
+    - [ ] DateTimeProperty
+    - [ ] DateProperty
+    - [ ] TimeProperty
+    - [ ] StructuredProperty
+    - [ ] LocalStructuredProperty
+    - [ ] GenericProperty
+    - [ ] ComputedProperty
+  - [ ] Polymodel Support
+- [x] Model core API
+  - [x] Datastore key expose and management
+  - [x] Key allocation helpers
+  - [x] Entity identity (`id` / `name`)
+  - [x] Entity hydration from datastore
+  - [x] Ancestor (hierarchical) key support
+  - [x] Dict-style and attribute-style access
+  - [x] Basic CRUD operations
+  - [x] Bulk CRUD operations
+  - [x] Lifecycle hooks
+  - [ ] Atomic get_or_insert
 
-### Query System
-- [ ] Query API
-  - [ ] Basic filtering
-  - [ ] Limits
-  - [ ] Fetching / iteration
+### Query API
+- [x] Pass through queries
+- [ ] ODM style filtering
+- [ ] Limits
+- [ ] Pagination / Cursors
+- [ ] Keys-only queries
+- [ ] Projection queries
 - [ ] Chained query filters
 - [ ] Transaction-bound queries
+- [ ] Aggregate queries
 - [ ] Warnings for potentially unindexed queries
 
 ### Persistence & Operations
-- [ ] Bulk operations
-  - [ ] `put_multi`
-  - [ ] `delete_multi`
-- [ ] Lightweight transaction context manager
+- [ ] Context
+- [ ] Transactions
+- [ ] Cache
+
 
 ### Schema & Metadata Introspection
-- [ ] Model schema introspection API
-- [ ] Field metadata exposure
-- [ ] Optional index declarations at the model level
+- [x] Model schema introspection API
+- [x] Field metadata exposure
+- [x] Optional index declarations at the model level
 - [ ] Index introspection (where possible)
 
 ### Async Support
-- [ ] Async model operations
-- [ ] Async query support
+- [ ] Async model API operations
+- [ ] Async query API support
 - [ ] Async transaction support
