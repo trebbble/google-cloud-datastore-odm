@@ -2,6 +2,11 @@
 
 [![CI](https://github.com/trebbble/google-cloud-datastore-odm/actions/workflows/ci.yml/badge.svg)](https://github.com/trebbble/google-cloud-datastore-odm/actions/workflows/ci.yml) ![Coverage](./coverage.svg)
 
+### Documentation
+https://trebbble.github.io/google-cloud-datastore-odm/
+
+---
+
 ### Dependencies
 - `uv sync all-groups`
 
