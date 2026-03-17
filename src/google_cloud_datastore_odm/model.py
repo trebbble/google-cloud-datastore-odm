@@ -158,7 +158,7 @@ class Model(metaclass=ModelMeta):
         else:
             self.key = key
             if self.key is None and parent is not None:
-                self.key = self._client().key(self._kind, parent=parent)
+                self.key = self.client().key(self._kind, parent=parent)
 
         for property_name, _property in self._properties.items():
             if property_name in kwargs:
@@ -309,7 +309,7 @@ class Model(metaclass=ModelMeta):
         if size <= 0:
             raise ValueError("Number of IDs to allocate must be greater than 0.")
 
-        client = cls._client()
+        client = cls.client()
         incomplete_key = client.key(cls._kind, parent=parent)
         return client.allocate_ids(incomplete_key, num_ids=size)
 
@@ -331,10 +331,10 @@ class Model(metaclass=ModelMeta):
         the ID during the put() operation.
         """
         if self.key is None:
-            self.key = self._client().key(self._kind)
+            self.key = self.client().key(self._kind)
 
     @classmethod
-    def _client(cls) -> datastore.Client:
+    def client(cls) -> datastore.Client:
         return get_client()
 
     @classmethod
@@ -344,7 +344,7 @@ class Model(metaclass=ModelMeta):
             parent: Optional[datastore.Key] = None,
     ) -> datastore.Key:
         """Construct a datastore Key for this model's kind."""
-        return cls._client().key(cls._kind, identifier, parent=parent)
+        return cls.client().key(cls._kind, identifier, parent=parent)
 
     def populate(self, **kwargs: Any) -> None:
         """
@@ -404,7 +404,7 @@ class Model(metaclass=ModelMeta):
     def get(cls, key: datastore.Key):
         """Fetch an entity by its datastore key and hydrate a model instance."""
         cls._pre_get_hook(key)
-        entity = cls._client().get(key)
+        entity = cls.client().get(key)
 
         instance = cls.from_entity(entity) if entity else None
         cls._post_get_hook(key, instance)
@@ -432,7 +432,7 @@ class Model(metaclass=ModelMeta):
         self._ensure_key()
         self._pre_put_hook()
 
-        client = self._client()
+        client = self.client()
 
         unindexed_names = set(self._unindexed_datastore_names)
 
@@ -469,7 +469,7 @@ class Model(metaclass=ModelMeta):
             raise ValueError("Cannot delete an entity that does not have a key.")
 
         self._pre_delete_hook(self.key)
-        self._client().delete(self.key)
+        self.client().delete(self.key)
         self._post_delete_hook(self.key)
 
     @classmethod
@@ -485,7 +485,7 @@ class Model(metaclass=ModelMeta):
         for key in keys:
             cls._pre_get_hook(key)
 
-        client = cls._client()
+        client = cls.client()
         entities = client.get_multi(keys)
         entity_map = {e.key: e for e in entities}
 
@@ -505,7 +505,7 @@ class Model(metaclass=ModelMeta):
         if not instances:
             return []
 
-        client = cls._client()
+        client = cls.client()
         entities_to_put = []
 
         # Use the pre-computed schema-level index exclusions for maximum speed
@@ -547,7 +547,7 @@ class Model(metaclass=ModelMeta):
         for key in keys:
             cls._pre_delete_hook(key)
 
-        cls._client().delete_multi(keys)
+        cls.client().delete_multi(keys)
 
         for key in keys:
             cls._post_delete_hook(key)
