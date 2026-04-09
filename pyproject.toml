@@ -5,18 +5,18 @@ description = "Minimal ORM for Google Cloud Datastore inspired by NDB"
 readme = "README.md"
 requires-python = "==3.14.*"
 dependencies = [
-    "google-cloud-datastore>=2.23.0",
+    "google-cloud-datastore>=2.24.0",
 ]
 
 [dependency-groups]
 dev = [
-    "pytest>=9.0.2",
-    "pytest-cov>=7.0.0",
-    "pytest-env>=1.2.0",
+    "pytest>=9.0.3",
+    "pytest-cov>=7.1.0",
+    "pytest-env>=1.6.0",
     "python-dotenv>=1.2.2",
-    "ruff>=0.15.5",
+    "ruff>=0.15.9",
     "genbadge[coverage]>=1.1.1",
-    "zensical>=0.0.27",
+    "zensical>=0.0.32",
     "mkdocstrings-python>=2.0.3",
 ]
 
