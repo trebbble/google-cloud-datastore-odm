@@ -454,7 +454,9 @@ class Model(metaclass=ModelMeta):
 
         for py_name, prop in cls._properties.items():
             if prop.datastore_name in entity:
-                kwargs[py_name] = entity[prop.datastore_name]
+                raw_value = entity[prop.datastore_name]
+                # noinspection PyProtectedMember
+                kwargs[py_name] = prop._from_base_type(raw_value)
 
         instance = cls(key=entity.key, **kwargs)
         return instance

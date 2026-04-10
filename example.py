@@ -10,7 +10,15 @@ import json
 
 from dotenv import load_dotenv
 
-from src.google_cloud_datastore_odm import IntegerProperty, Model, StringProperty
+from src.google_cloud_datastore_odm import (
+    BooleanProperty,
+    FloatProperty,
+    IntegerProperty,
+    JsonProperty,
+    Model,
+    StringProperty,
+    TextProperty,
+)
 from src.google_cloud_datastore_odm.model import field_validator, model_validator
 
 load_dotenv()
@@ -39,11 +47,21 @@ class Article(Model):
 
     word_count = IntegerProperty(default=0)
 
+    # Strict boolean and float types
+    is_featured = BooleanProperty(default=False)
+    score = FloatProperty()
+
     # Repeated list of strings
     tags = StringProperty(repeated=True)
 
-    # Unindexed property (cannot be filtered on in queries)
+    # Unindexed string (cannot be filtered on in queries)
     internal_notes = StringProperty(indexed=False)
+
+    # Automatically unindexed by default (safe for >1500 bytes)
+    body = TextProperty()
+
+    # Automatically unindexed by default (safe for deep dicts/lists)
+    metadata = JsonProperty()
 
     # -----------------------------------------------------------------------
     # 2. Field-level validators
@@ -144,8 +162,12 @@ article = Article(
     title="Hello, World!",
     author="Alice",
     word_count=500,
+    is_featured=True,
+    score=98.5,
     tags=["python", "odm"],
-    internal_notes="Review again tomorrow."
+    internal_notes="Review again tomorrow.",
+    body="This is a very large block of text that won't blow up our indexes.",
+    metadata={"views": 0, "platforms": ["web", "mobile"]}
 )
 print(f"Created: {article}")
 print(f"Has key: {article.key is not None}")
@@ -190,6 +212,7 @@ fetched = Article.get(key=saved_article_key)
 print(f"Fetched: {fetched}")
 print(f"Fetched ID: {fetched.key.id_or_name}")
 print(f"Fetched Tags (Repeated): {fetched.tags}")
+print(f"Fetched Metadata (JSON): {fetched.metadata}")
 
 
 # ---------------------------------------------------------------------------

@@ -6,6 +6,7 @@ This module provides the base `Property` descriptor and its type-specific subcla
 validation, default values, and Datastore schema mapping.
 """
 
+import json
 from typing import TYPE_CHECKING, Any, Callable, List, Optional
 
 if TYPE_CHECKING:
@@ -43,18 +44,18 @@ class Property:
         """Initialize a new Property.
 
         Args:
-            name (Optional[str]): The Datastore column name. If omitted, defaults to 
+            name (Optional[str]): The Datastore column name. If omitted, defaults to
                 the Python attribute name. Useful for mapping legacy database fields.
-            indexed (bool): Whether the Datastore should index this property. Set to 
+            indexed (bool): Whether the Datastore should index this property. Set to
                 False for massive text blocks to save space and reduce write costs. If not sure leave this True
                 and pass unindexed properties on the fly during put() operations.
-            repeated (bool): If True, this property expects an iterable (list/set/tuple) 
+            repeated (bool): If True, this property expects an iterable (list/set/tuple)
                 and stores it as an array in Datastore. Defaults to False.
-            required (bool): If True, assigning `None` or an empty list (if repeated) 
+            required (bool): If True, assigning `None` or an empty list (if repeated)
                 will raise a ValueError. Defaults to False.
-            default (Any): The default value or a zero-argument callable to generate one 
+            default (Any): The default value or a zero-argument callable to generate one
                 (e.g., `default=list` or `default=datetime.now`).
-            choices (Optional[list]): An optional list of allowed values. Assignments 
+            choices (Optional[list]): An optional list of allowed values. Assignments
                 not in this list will raise a ValueError.
             validators (Optional[List[Callable]]): A list of custom validation functions.
                 Each function should accept a single value, validate/mutate it, and return it.
@@ -100,7 +101,7 @@ class Property:
             self.datastore_name = name
 
     def _validate_type(self, value: Any) -> Any:
-        """Enforce Python types. 
+        """Enforce Python types.
 
         This method should be overridden by subclasses (e.g., `StringProperty`).
 
@@ -150,7 +151,7 @@ class Property:
     def validate(self, instance: "Model", value: Any) -> Any:
         """Validate and process a value (or list of values) for this property.
 
-        Handles `None` assignments, required checks, and maps the validation 
+        Handles `None` assignments, required checks, and maps the validation
         pipeline over elements if the property is `repeated`.
 
         Args:
@@ -205,6 +206,15 @@ class Property:
         # noinspection PyProtectedMember
         instance._values.pop(self._python_name, None)
 
+    def _from_base_type(self, value: Any) -> Any:
+        """
+        Convert a value from the Datastore base type to the Python user type.
+
+        By default, this is a simple pass-through. Subclasses (like JsonProperty)
+        can override this to sanitize or cast data coming back from the database.
+        """
+        return value
+
 
 class StringProperty(Property):
     """A Datastore property that strictly enforces string values."""
@@ -229,8 +239,8 @@ class StringProperty(Property):
 class IntegerProperty(Property):
     """A Datastore property that strictly enforces integer values.
 
-    Note: Python evaluates booleans as subclasses of integers (`isinstance(True, int)` 
-    is True). This descriptor explicitly rejects boolean values to maintain strict 
+    Note: Python evaluates booleans as subclasses of integers (`isinstance(True, int)`
+    is True). This descriptor explicitly rejects boolean values to maintain strict
     Datastore type integrity.
     """
 
@@ -249,3 +259,100 @@ class IntegerProperty(Property):
         if not isinstance(value, int) or isinstance(value, bool):
             raise TypeError(f"Property '{self._python_name}' must be int")
         return value
+
+
+class BooleanProperty(Property):
+    """A Datastore property that strictly enforces boolean values."""
+
+    def _validate_type(self, value: Any) -> Any:
+        """Enforce that the value is a boolean.
+
+        Args:
+            value (Any): The value to check.
+
+        Raises:
+            TypeError: If the value is not a bool.
+
+        Returns:
+            bool: The validated boolean.
+        """
+        if not isinstance(value, bool):
+            raise TypeError(f"Property '{self._python_name}' must be a bool")
+        return value
+
+
+class FloatProperty(Property):
+    """A Datastore property that enforces floating-point values.
+
+    This property safely accepts both `float` and `int` types, automatically
+    casting `int` assignments to `float` to prevent strict type errors over
+    simple math (e.g. assigning `1` instead of `1.0`).
+    """
+
+    def _validate_type(self, value: Any) -> Any:
+        """Enforce that the value is a float or integer.
+
+        Args:
+            value (Any): The value to check.
+
+        Raises:
+            TypeError: If the value is not an int/float, or if it is a boolean.
+
+        Returns:
+            float: The validated and cast floating-point number.
+        """
+        if not isinstance(value, (int, float)) or isinstance(value, bool):
+            raise TypeError(f"Property '{self._python_name}' must be a float")
+        return float(value)
+
+
+class TextProperty(StringProperty):
+    """A Datastore property for large strings.
+
+    Identical to StringProperty, but safely defaults to `indexed=False`.
+    Google Cloud Datastore imposes a 1500-byte limit on indexed strings.
+    Use this property for article bodies, comments, and large blobs of text.
+    """
+
+    def __init__(self, **kwargs: Any):
+        """Initialize the TextProperty, forcing indexed to False by default."""
+        kwargs.setdefault("indexed", False)
+        super().__init__(**kwargs)
+
+
+class JsonProperty(Property):
+    """A Datastore property that enforces JSON-serializable structures.
+
+    This property acts as a safety net to ensure that complex nested structures
+    (dicts, lists) are valid JSON. To prevent Datastore index explosion on
+    arbitrarily nested keys, it defaults to `indexed=False`.
+
+    Note: The underlying Google Cloud Datastore client will natively save these
+    structures as `EmbeddedEntity` or `ListValue` items in the database.
+    """
+
+    def __init__(self, **kwargs: Any):
+        """Initialize the JsonProperty, forcing indexed to False by default."""
+        kwargs.setdefault("indexed", False)
+        super().__init__(**kwargs)
+
+    def _validate_type(self, value: Any) -> Any:
+        """Enforce that the value is JSON-serializable."""
+        try:
+            json.dumps(value)
+        except (TypeError, ValueError) as e:
+            raise TypeError(f"Property '{self._python_name}' must be JSON serializable: {e}") from e
+        return value
+
+    def _from_base_type(self, value: Any) -> Any:
+        """
+        Sanitize the value coming back from the Datastore.
+
+        Datastore natively converts nested dictionaries into `datastore.Entity`
+        objects. This round-trips the data through JSON to recursively strip
+        out those Datastore types and return pure Python primitives.
+        """
+        if value is None:
+            return None
+
+        return json.loads(json.dumps(value))

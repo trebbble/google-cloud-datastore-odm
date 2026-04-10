@@ -26,23 +26,34 @@ Models are defined by inheriting from the `Model` class. You map Datastore field
 * **`name`**: Maps the Python attribute to a legacy/different Datastore column name.
 
 ```python
-from src.google_cloud_datastore_odm import IntegerProperty, Model, StringProperty
+from src.google_cloud_datastore_odm import (
+    BooleanProperty,
+    FloatProperty,
+    IntegerProperty,
+    JsonProperty,
+    Model,
+    StringProperty,
+    TextProperty,
+)
 
 class Article(Model):
     __kind__ = "Article"
 
     title = StringProperty(required=True)
-    
     # Maps 'author' in Python to 'author_name' in Datastore
     author = StringProperty(required=True, name="author_name")
-
     status = StringProperty(default="draft", choices=["draft", "published", "archived"])
     rating = IntegerProperty(choices=[1, 2, 3, 4, 5])
     word_count = IntegerProperty(default=0)
+    is_featured = BooleanProperty(default=False)
+    score = FloatProperty()
     tags = StringProperty(repeated=True)
-
-    # Unindexed property (cannot be filtered on in queries)
+    # Unindexed string (cannot be filtered on in queries)
     internal_notes = StringProperty(indexed=False)
+    # Automatically unindexed by default (safe for >1500 bytes)
+    body = TextProperty()
+    # Automatically unindexed by default (safe for deep dicts/lists)
+    metadata = JsonProperty()
 ```
 
 ## 3. Validation
