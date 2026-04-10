@@ -46,7 +46,7 @@ https://trebbble.github.io/google-cloud-datastore-odm/
     - [x] `kind`
     - [x] `namespace`
     - [x] `project`
-    - [ ] `dabase`
+    - [ ] `database`
 - [x] Property system
   - [x] Descriptor-based field definitions
   - [x] Field defaults
