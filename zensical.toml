@@ -48,5 +48,8 @@ inventories = ["https://docs.python.org/3/objects.inv"]
 
 [project.plugins.mkdocstrings.handlers.python.options]
 docstring_style = "google"
-inherited_members = true
+inherited_members = false
 show_source = false
+members_order = "source"
+filters = ["!^_"]
+merge_init_into_class = true

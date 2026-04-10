@@ -391,6 +391,14 @@ class DateTimeProperty(Property):
             tzinfo: Optional[datetime.tzinfo] = None,
             **kwargs: Any
     ):
+        """Initialize a new DateTimeProperty.
+
+        Args:
+            auto_now (bool): If True, automatically set to the current time on every put().
+            auto_now_add (bool): If True, automatically set to the current time when first created.
+            tzinfo (Optional[datetime.tzinfo]): The timezone to convert Datastore's UTC to/from.
+            **kwargs (Any): Additional base property arguments (e.g., `name`, `required`, `indexed`).
+        """
         self.auto_now = auto_now
         self.auto_now_add = auto_now_add
         self.tzinfo = tzinfo
@@ -441,6 +449,24 @@ class DateProperty(DateTimeProperty):
     at midnight UTC before saving, and casts back to a Date when reading.
     """
 
+    def __init__(
+            self,
+            *,
+            auto_now: bool = False,
+            auto_now_add: bool = False,
+            tzinfo: Optional[datetime.tzinfo] = None,
+            **kwargs: Any
+    ):
+        """Initialize a new DateProperty.
+
+        Args:
+            auto_now (bool): If True, automatically set to the current date on every put().
+            auto_now_add (bool): If True, automatically set to the current date when first created.
+            tzinfo (Optional[datetime.tzinfo]): The timezone used to evaluate the "current" date.
+            **kwargs (Any): Additional base property arguments (e.g., `name`, `required`, `indexed`).
+        """
+        super().__init__(auto_now=auto_now, auto_now_add=auto_now_add, tzinfo=tzinfo, **kwargs)
+
     def _validate_type(self, value: Any) -> Any:
         if not isinstance(value, datetime.date) or isinstance(value, datetime.datetime):
             raise TypeError(f"Property '{self._python_name}' must be a datetime.date")
@@ -467,6 +493,24 @@ class TimeProperty(DateTimeProperty):
     Datastore only supports Datetimes, so this property casts to a Datetime
     on Jan 1, 1970 UTC before saving, and casts back to a Time when reading.
     """
+
+    def __init__(
+            self,
+            *,
+            auto_now: bool = False,
+            auto_now_add: bool = False,
+            tzinfo: Optional[datetime.tzinfo] = None,
+            **kwargs: Any
+    ):
+        """Initialize a new TimeProperty.
+
+        Args:
+            auto_now (bool): If True, automatically set to the current time on every put().
+            auto_now_add (bool): If True, automatically set to the current time when first created.
+            tzinfo (Optional[datetime.tzinfo]): The timezone used to evaluate the "current" time.
+            **kwargs (Any): Additional base property arguments (e.g., `name`, `required`, `indexed`).
+        """
+        super().__init__(auto_now=auto_now, auto_now_add=auto_now_add, tzinfo=tzinfo, **kwargs)
 
     def _validate_type(self, value: Any) -> Any:
         if not isinstance(value, datetime.time):
