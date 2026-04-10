@@ -55,6 +55,7 @@ class Article(Model):
     created_at = DateTimeProperty(auto_now_add=True, tzinfo=datetime.timezone.utc)
     updated_at = DateTimeProperty(auto_now=True, tzinfo=datetime.timezone.utc)
     publish_date = DateProperty()
+    publish_time = TimeProperty()
     tags = StringProperty(repeated=True)
     # Unindexed string (cannot be filtered on in queries)
     internal_notes = StringProperty(indexed=False)
