@@ -51,16 +51,16 @@ https://trebbble.github.io/google-cloud-datastore-odm/
   - [x] Field defaults
   - [x] Field-level validation
   - Properties:
-    - [ ] BooleanProperty
+    - [x] BooleanProperty
     - [x] IntegerProperty
-    - [ ] FloatProperty
+    - [x] FloatProperty
     - [ ] BlobProperty
     - [ ] CompressedTextProperty
-    - [ ] TextProperty
+    - [x] TextProperty
     - [x] StringProperty
     - [ ] GeoPtProperty
     - [ ] PickleProperty
-    - [ ] JsonProperty
+    - [x] JsonProperty
     - [ ] UserProperty
     - [ ] KeyProperty
     - [ ] BlobKeyProperty
