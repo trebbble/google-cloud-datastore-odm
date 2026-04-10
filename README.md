@@ -43,9 +43,10 @@ https://trebbble.github.io/google-cloud-datastore-odm/
   - [x] Metaclass-driven configuration
   - [x] Model-level validation hooks
   - [ ] Explicit model overrides via `Meta` class
-    - [ ] `kind`
-    - [ ] `namespace`
-    - [ ] `project`
+    - [x] `kind`
+    - [x] `namespace`
+    - [x] `project`
+    - [ ] `dabase`
 - [x] Property system
   - [x] Descriptor-based field definitions
   - [x] Field defaults

@@ -13,7 +13,8 @@ class KeyTestModel(Model):
 def test_model_invalid_kind():
     with pytest.raises(TypeError):
         class InvalidKindModel(Model):
-            __kind__ = 123
+            class Meta:
+                kind = 123
 
 
 def test_model_repr_with_key():
@@ -82,7 +83,6 @@ def test_model_invalid_validator_not_callable():
 
 def test_datastore_alias_and_indexing(reset_datastore):
     class AliasModel(Model):
-        __kind__ = "AliasModel"
         python_name = StringProperty(name="ds_alias")
         unindexed_text = StringProperty(indexed=False, name="ds_unindexed")
 
@@ -126,7 +126,6 @@ def test_uncopyable_default():
 def test_init_with_explicit_id(reset_datastore):
 
     class IdModel(Model):
-        __kind__ = "IdModel"
         name = StringProperty()
 
     instance = IdModel(id=999, name="Test ID")
@@ -208,7 +207,6 @@ def test_model_init_reserved_kwargs_routing():
     """Ensure id, parent, and key kwargs are correctly routed to Datastore Keys."""
 
     class TestNode(Model):
-        __kind__ = "TestNode"
         value = StringProperty()
 
     node1 = TestNode(id="my-node-1", value="test")
@@ -248,8 +246,10 @@ def test_unreserved_metadata_kwarg():
     """Ensure passing 'id' directly works if no 'id' property is defined."""
 
     class NoIdModel(Model):
-        __kind__ = "NoId"
         name = StringProperty()
+
+        class Meta:
+            kind = "NoId"
 
     instance = NoIdModel(id=444, name="Test")
     assert instance.key is not None
@@ -261,9 +261,11 @@ def test_reserved_metadata_kwarg():
     """Ensure passing '_id' directly works if 'id' property is defined."""
 
     class NoIdModel(Model):
-        __kind__ = "NoId"
         id = IntegerProperty()
         name = StringProperty()
+
+        class Meta:
+            kind = "NoId"
 
     instance = NoIdModel(_id=444, name="Test")
     assert instance.key is not None
@@ -275,8 +277,10 @@ def test_repr_numeric_id():
     """Ensure __repr__ formats correctly when the key uses a numeric ID."""
 
     class ReprModel(Model):
-        __kind__ = "Repr"
         val = IntegerProperty()
+
+        class Meta:
+            kind = "Repr"
 
     instance = ReprModel(id=123, val=5)
 
@@ -376,10 +380,12 @@ def test_put_exclude_from_indexes_emulator(reset_datastore):
     """Ensure put() correctly merges schema-level and instance-level index exclusions in Datastore."""
 
     class IndexTestModel(Model):
-        __kind__ = "IndexTest"
         normal = StringProperty()
         always_unindexed = StringProperty(indexed=False)
         dynamic_unindexed = StringProperty(name="dynamic_db_name")
+
+        class Meta:
+            kind = "IndexTest"
 
     assert frozenset(["always_unindexed"]) == IndexTestModel._unindexed_datastore_names
 
@@ -426,7 +432,6 @@ def test_put_exclude_from_indexes_emulator(reset_datastore):
 def test_model_equality():
     """Ensure __eq__ strictly compares both keys and underlying values (NDB style)."""
     class EqModel(Model):
-        __kind__ = "EqModel"
         name = StringProperty()
 
     m1 = EqModel(name="Alice")
@@ -457,7 +462,6 @@ def test_model_delete(reset_datastore):
     """Ensure single instance deletion works against the emulator."""
 
     class DeleteModel(Model):
-        __kind__ = "DeleteModel"
         name = StringProperty()
 
     instance = DeleteModel(name="To Be Deleted")
@@ -478,7 +482,6 @@ def test_get_multi(reset_datastore):
     """Ensure get_multi retrieves instances and preserves order, including missing ones."""
 
     class BatchGetModel(Model):
-        __kind__ = "BatchGetModel"
         val = IntegerProperty()
 
     instances = [
@@ -512,7 +515,6 @@ def test_put_multi(reset_datastore):
     """Ensure put_multi saves multiple instances and generates auto-IDs."""
 
     class BatchPutModel(Model):
-        __kind__ = "BatchPutModel"
         val = IntegerProperty()
 
     instances = [
@@ -543,7 +545,6 @@ def test_delete_multi(reset_datastore):
     """Ensure delete_multi removes multiple instances from the emulator."""
 
     class BatchDelModel(Model):
-        __kind__ = "BatchDelModel"
         val = IntegerProperty()
 
     instances = [
@@ -565,34 +566,11 @@ def test_delete_multi(reset_datastore):
     BatchDelModel.delete_multi([])
 
 
-def test_has_complete_key():
-    """Ensure has_complete_key correctly identifies partial vs complete keys."""
-
-    class KeyStatusModel(Model):
-        __kind__ = "KeyStatusModel"
-        name = StringProperty()
-
-    m1 = KeyStatusModel(name="Alice")
-    assert m1.has_complete_key is False
-
-    m1._ensure_key()
-    assert m1.key is not None
-    assert m1.key.is_partial is True
-    assert m1.has_complete_key is False
-
-    m2 = KeyStatusModel(id="my-custom-id", name="Bob")
-    assert m2.has_complete_key is True
-    assert m2.key.is_partial is False
-
-    m3 = KeyStatusModel(id=123, name="Charlie")
-    assert m3.has_complete_key is True
-
-
 def test_allocate_ids():
     """Ensure allocate_ids successfully reserves a batch of numeric IDs from Datastore."""
 
     class AllocModel(Model):
-        __kind__ = "AllocModel"
+        pass
 
     keys = AllocModel.allocate_ids(size=5)
 
@@ -618,16 +596,17 @@ def test_allocate_key_instance():
     """Ensure allocate_key assigns a real database ID to an instance."""
 
     class AllocInstModel(Model):
-        __kind__ = "AllocInstModel"
+        pass
 
     m = AllocInstModel()
-    assert m.has_complete_key is False
+    assert m.key is None
 
     allocated_key = m.allocate_key()
 
     assert allocated_key is not None
     assert allocated_key == m.key
-    assert m.has_complete_key is True
+    assert m.key is not None
+    assert m.key.is_partial is False
     assert isinstance(m.key.id, int)
 
 
@@ -635,7 +614,7 @@ def test_ensure_key_no_rpc():
     """Ensure _ensure_key assigns an incomplete key without needing the emulator."""
 
     class EnsureModel(Model):
-        __kind__ = "EnsureModel"
+        pass
 
     m = EnsureModel()
     assert m.key is None
@@ -655,7 +634,6 @@ def test_lifecycle_hooks(reset_datastore):
     """Ensure all lifecycle hooks fire in the correct order for single and batch operations."""
 
     class HookModel(Model):
-        __kind__ = "HookModel"
         name = StringProperty()
 
         history = []
@@ -716,3 +694,84 @@ def test_lifecycle_hooks(reset_datastore):
     HookModel.history.clear()
     HookModel.delete_multi(keys)
     assert HookModel.history == ["pre_delete", "pre_delete", "post_delete", "post_delete"]
+
+
+def test_multi_tenant_routing_coverage():
+    """Cover all namespace and project routing branches in Model and Query."""
+    class TenantModel(Model):
+        class Meta:
+            kind = "Tenant"
+            project = "custom-project"
+            namespace = "custom-namespace"
+
+    instance = TenantModel()
+    instance.allocate_key()
+
+    assert instance.key.project == "custom-project"
+    assert instance.key.namespace == "custom-namespace"
+
+    repr_str = repr(instance)
+    assert "project='custom-project'" in repr_str
+    assert "namespace='custom-namespace'" in repr_str
+
+    keys = TenantModel.allocate_ids(1)
+    assert keys[0].project == "custom-project"
+    assert keys[0].namespace == "custom-namespace"
+
+    key = TenantModel.key_from_id("test-id")
+    assert key.project == "custom-project"
+    assert key.namespace == "custom-namespace"
+
+    q = TenantModel.query()
+    list(q.fetch(limit=1))
+
+    class BasicModel(Model):
+        pass
+
+    adhoc_inst = BasicModel(project="p2", namespace="n2")
+    assert adhoc_inst.key.project == "p2"
+
+    adhoc_key = BasicModel.key_from_id("id", project="p3", namespace="n3")
+    assert adhoc_key.project == "p3"
+
+    adhoc_alloc = BasicModel.allocate_ids(1, project="p4", namespace="n4")[0]
+    assert adhoc_alloc.project == "p4"
+
+    adhoc_query = BasicModel.query(project="p5", namespace="n5")
+    list(adhoc_query.fetch(limit=1))
+
+
+def test_multi_batch_project_mismatch():
+    """Ensure batch operations fail fast if instances belong to different projects."""
+    class BatchModel(Model):
+        pass
+
+    k1 = BatchModel.client(project="p1").key(BatchModel.kind(), 1)
+    k2 = BatchModel.client(project="p2").key(BatchModel.kind(), 2)
+    with pytest.raises(ValueError):
+        BatchModel.get_multi([k1, k2])
+
+    with pytest.raises(ValueError):
+        BatchModel.delete_multi([k1, k2])
+
+    inst1 = BatchModel(project="p1")
+    inst2 = BatchModel(project="p2")
+    with pytest.raises(ValueError):
+        BatchModel.put_multi([inst1, inst2])
+
+
+def test_ensure_key_with_meta_namespace():
+    """Cover the namespace injection branch inside _ensure_key."""
+
+    class MetaNamespaceModel(Model):
+        class Meta:
+            kind = "EnsuredKind"
+            namespace = "test-namespace"
+
+    instance = MetaNamespaceModel()
+    assert instance.key is None
+
+    # noinspection PyProtectedMember
+    instance._ensure_key()
+    assert instance.key is not None
+    assert instance.key.namespace == "test-namespace"

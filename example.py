@@ -30,7 +30,7 @@ load_dotenv()
 
 # ---------------------------------------------------------------------------
 # 1. Model Definition
-#    - __kind__: Customizes the Datastore kind (defaults to class name).
+#    - Meta class: Customizes the Datastore kind, namespace, and project.
 #    - required/default: Enforce presence or provide fallback values.
 #    - choices: Restricts assignments to a specific list of values.
 #    - repeated: Turns the property into a list (defaults to []).
@@ -39,8 +39,6 @@ load_dotenv()
 # ---------------------------------------------------------------------------
 
 class Article(Model):
-    __kind__ = "Article"
-
     title = StringProperty(required=True)
     # Maps 'author' in Python to 'author_name' in Datastore
     author = StringProperty(required=True, name="author_name")
@@ -118,8 +116,6 @@ def no_emoji_allowed(value: str) -> str:
 
 
 class Comment(Model):
-    __kind__ = "Comment"
-
     body = StringProperty(required=True, validators=[no_emoji_allowed])
     score = IntegerProperty(default=0)
 
@@ -310,15 +306,15 @@ print(f"Deleted remaining {len(remaining_keys)} articles using delete_multi.")
 
 
 # ---------------------------------------------------------------------------
-# 14. Explicit key allocation (.allocate_key, .allocate_ids, .has_complete_key)
+# 14. Explicit key allocation (.allocate_key, .allocate_ids)
 # ---------------------------------------------------------------------------
 
 print("\n--- Key Allocation ---")
 draft = Article(title="Unfinished Draft", author="Carol", status="draft", word_count=50)
-print(f"Has complete key before allocation? {draft.has_complete_key}")
+print(f"Has complete key before allocation? {draft}")
 
 draft.allocate_key()
-print(f"Has complete key after allocation? {draft.has_complete_key}")
+print(f"Has complete key after allocation? {draft}")
 print(f"Allocated key before put: {draft.key}")
 draft_key = draft.put()
 print(f"After put key: {draft.key}, Returned key: {draft_key}, ID: {draft.key.id_or_name}")
@@ -378,7 +374,6 @@ print("\n--- Lifecycle Hooks ---")
 
 
 class TrackedTask(Model):
-    __kind__ = "TrackedTask"
     description = StringProperty()
 
     def _pre_put_hook(self):
@@ -414,5 +409,52 @@ fetched_task = TrackedTask.get(task_key)
 
 print("\nDeleting the task to trigger delete hooks...")
 fetched_task.delete()
+
+
+# ---------------------------------------------------------------------------
+# 18. Cross-Project Routing & Multi-Tenancy
+# ---------------------------------------------------------------------------
+
+print("\n--- Cross-Project & Multi-Tenant Routing ---")
+
+
+class SystemLog(Model):
+    event = StringProperty()
+    user_id = StringProperty()
+
+    class Meta:
+        kind = "AuditLog"
+        project = "central-logging-system"
+        namespace = "default-events"
+
+
+log_default = SystemLog(event="Startup", user_id="system")
+log_default.put()
+print(f"Saved default log: "
+      f"project={log_default.key.project}, "
+      f"namespace={log_default.key.namespace}, "
+      f"kind={log_default.key.kind}")
+print(log_default)
+
+
+log_tenant = SystemLog(
+    event="Login",
+    user_id="alice",
+    project="customer-project-123",
+    namespace="tenant-b"
+)
+log_tenant.put()
+print(f"Saved ad-hoc log: project={log_tenant.key.project}, namespace={log_tenant.key.namespace}")
+print(log_tenant)
+
+central_logs = list(SystemLog.query().filter("event", "=", "Startup").fetch())
+print(f"Found {len(central_logs)} startup logs in the central project.")
+
+customer_logs = list(
+    SystemLog.query(project="customer-project-123", namespace="tenant-b")
+    .filter("user_id", "=", "alice")
+    .fetch()
+)
+print(f"Found {len(customer_logs)} logs for Alice in customer-project-123.")
 
 print("\nDone!")

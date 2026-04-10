@@ -54,13 +54,11 @@ class Constants:
 
 
 class DummyTestModel(Model):
-    __kind__ = "DummyTestModel"
     test_string_field = StringProperty(required=True, default=Constants.STRING_DEFAULT)
     test_integer_field = IntegerProperty(required=True, default=Constants.INTEGER_DEFAULT)
 
 
 class QueryTestModel(Model):
-    __kind__ = "QueryTestModel"
     name = StringProperty()
     age = IntegerProperty()
 

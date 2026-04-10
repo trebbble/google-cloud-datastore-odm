@@ -18,7 +18,6 @@ GOOGLE_CLOUD_PROJECT=google-cloud-datastore-odm-dev
 
 Models are defined by inheriting from the `Model` class. You map Datastore fields using property descriptors.
 
-* **`__kind__`**: Customizes the Datastore kind (defaults to the class name).
 * **`required` / `default`**: Enforces presence or provides a fallback value.
 * **`choices`**: Restricts assignments to a specific list of values.
 * **`repeated`**: Turns the property into a list (defaults to `[]`).
@@ -41,7 +40,6 @@ from src.google_cloud_datastore_odm import (
 )
 
 class Article(Model):
-    __kind__ = "Article"
 
     title = StringProperty(required=True)
     # Maps 'author' in Python to 'author_name' in Datastore
@@ -294,11 +292,9 @@ class Article(Model):
     internal_notes = StringProperty(indexed=False)
 
 draft = Article(title="Draft", author="Carol")
-print(draft.has_complete_key) # False
 
 # Explicitly allocate a single key for this instance
 draft.allocate_key()
-print(draft.has_complete_key) # True
 
 # Reserve a batch of 5 IDs from Datastore without creating instances
 reserved_keys = Article.allocate_ids(size=5)
@@ -312,7 +308,6 @@ Models natively support NDB-style hooks (`_pre_put_hook`, `_post_get_hook`, etc.
 from src.google_cloud_datastore_odm import Model, StringProperty
 
 class TrackedTask(Model):
-    __kind__ = "TrackedTask"
     description = StringProperty()
 
     def _pre_put_hook(self):
@@ -333,4 +328,49 @@ class TrackedTask(Model):
 task = TrackedTask(description="Learn Python ODM")
 task_key = task.put() 
 fetched_task = TrackedTask.get(task_key)
+```
+
+
+## 10. Multi-Tenancy & Dynamic Routing
+
+Google Cloud Datastore is heavily used for multi-tenant applications. The ODM natively supports routing data to specific GCP Projects or Datastore Namespaces. You can define static routing defaults using an inner `Meta` class, or dynamically override them on the fly for specific instances or queries.
+
+```python
+from src.google_cloud_datastore_odm import Model, StringProperty
+
+class SystemLog(Model):
+    event = StringProperty()
+    user_id = StringProperty()
+    
+    class Meta:
+        # These defaults will be used unless explicitly overridden
+        kind = "AuditLog"
+        project = "central-logging-system"
+        namespace = "default-events"
+
+# Statically routed: Uses the Meta class defaults
+log_default = SystemLog(event="Startup", user_id="system")
+log_default.put()
+print(log_default.key.namespace)  # Outputs: default-events
+
+# Dynamically routed: Override project and namespace on the fly
+# This completely bypasses the Meta defaults and routes to a custom GCP project!
+log_tenant = SystemLog(
+    event="Login", 
+    user_id="alice", 
+    project="customer-project-123", 
+    namespace="tenant-b"
+)
+log_tenant.put()
+
+# Querying specific projects/namespaces
+# Queries the default Meta project/namespace:
+central_logs = list(SystemLog.query().filter("event", "=", "Startup").fetch())
+
+# Queries the ad-hoc customer project/namespace:
+customer_logs = list(
+    SystemLog.query(project="customer-project-123", namespace="tenant-b")
+    .filter("user_id", "=", "alice")
+    .fetch()
+)
 ```

@@ -7,36 +7,28 @@ entire application lifecycle. This prevents connection overhead and
 memory leaks.
 """
 
-from typing import Optional
+from typing import Dict, Optional
 
 from google.cloud import datastore
 
-_client: Optional[datastore.Client] = None
+_clients: Dict[Optional[str], datastore.Client] = {}
 
 
-def get_client() -> datastore.Client:
+def get_client(project: Optional[str] = None) -> datastore.Client:
     """Retrieve the global Google Cloud Datastore client instance.
 
-    If the client has not been initialized yet, this function will create a new
-    instance. It automatically infers the Google Cloud Project ID and credentials
-    from the environment (e.g., `GOOGLE_CLOUD_PROJECT`, `GOOGLE_APPLICATION_CREDENTIALS`, 
-    or the Datastore Emulator host).
+    If the client for the requested project has not been initialized yet,
+    this function will create a new instance. If `project` is None, it
+    automatically infers the Google Cloud Project ID and credentials
+    from the environment.
 
-    Subsequent calls will return the cached singleton instance.
+    Args:
+        project (Optional[str]): The specific GCP project ID to connect to.
 
     Returns:
         datastore.Client: The active Datastore client connection.
-
-    Example:
-        ```python
-        from google_cloud_datastore_odm.client import get_client
-
-        # Access the raw GCP client if you need to bypass the ODM
-        client = get_client()
-        query = client.query(kind="RawKind")
-        ```
     """
-    global _client
-    if _client is None:
-        _client = datastore.Client()
-    return _client
+    global _clients
+    if project not in _clients:
+        _clients[project] = datastore.Client(project=project)
+    return _clients[project]

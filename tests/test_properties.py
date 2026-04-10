@@ -299,7 +299,6 @@ def test_json_property_from_base_type_scrubs_entities():
     """Verify that JsonProperty correctly scrubs <Entity> wrappers during hydration."""
 
     class JsonModel(Model):
-        __kind__ = "JsonModel"
         data: dict | list = JsonProperty()
 
     ds_entity = datastore.Entity()
@@ -329,8 +328,10 @@ def test_model_from_entity_with_none():
     """Cover the early-exit None check in Model.from_entity."""
 
     class DummyModel(Model):
-        __kind__ = "Dummy"
         text = StringProperty()
+
+        class Meta:
+            kind = "Dummy"
 
     instance = DummyModel.from_entity(None)
     assert instance is None

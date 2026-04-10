@@ -24,21 +24,30 @@ class Query:
     it automatically hydrates the raw Datastore entities back into your ODM `Model` instances.
     """
 
-    def __init__(self, model_cls: "type[Model]"):
+    def __init__(
+            self,
+            model_cls: "type[Model]",
+            project: Optional[str] = None,
+            namespace: Optional[str] = None
+    ):
         """Initialize a new Query for a specific model kind.
 
         Args:
             model_cls (type[Model]): The Model class this query will return instances of.
-                The query automatically targets the `__kind__` associated with this class.
+                The query automatically targets the kind associated with this class.
+            project (Optional[str]): An optional project override.
+            namespace (Optional[str]): An optional namespace override.
         """
         self.model_cls = model_cls
+        self.project = project
+        self.namespace = namespace
         self._filters: list[tuple[str, str, Any]] = []
 
     def filter(self, field: str, op: str, value: Any) -> "Query":
         """Add a property filter to the query.
 
-        Filters can be chained together. Currently, this method requires the actual 
-        Datastore property name (e.g., if a Python property is aliased using `name="..."`, 
+        Filters can be chained together. Currently, this method requires the actual
+        Datastore property name (e.g., if a Python property is aliased using `name="..."`,
         you must query using the aliased name).
 
         Args:
@@ -65,11 +74,11 @@ class Query:
     def fetch(self, limit: Optional[int] = None) -> Generator["Model", None, None]:
         """Execute the query and yield hydrated model instances.
 
-        This method acts as a generator, yielding instances one by one as they are 
+        This method acts as a generator, yielding instances one by one as they are
         retrieved from the Datastore. This is memory-efficient for large datasets.
 
         Args:
-            limit (Optional[int]): The maximum number of entities to return. 
+            limit (Optional[int]): The maximum number of entities to return.
                 Defaults to None (fetch all matching entities).
 
         Yields:
@@ -84,8 +93,13 @@ class Query:
                 print(article.title)
             ```
         """
-        client = get_client()
-        query = client.query(kind=self.model_cls.kind())
+        client = get_client(project=self.project)
+        kwargs = {}
+
+        if self.namespace:
+            kwargs["namespace"] = self.namespace
+
+        query = client.query(kind=self.model_cls.kind(), **kwargs)
 
         for name, op, value in self._filters:
             query.add_filter(filter=PropertyFilter(name, op, value))

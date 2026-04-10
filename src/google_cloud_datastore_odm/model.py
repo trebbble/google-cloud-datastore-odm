@@ -83,6 +83,19 @@ class ModelMeta(type):
 
         _reserved_names = {"key"}
 
+        meta_config = class_attrs.pop("Meta", None)
+        datastore_project = None
+        datastore_namespace = None
+        datastore_kind = class_name
+
+        if meta_config:
+            datastore_project = getattr(meta_config, "project", None)
+            datastore_namespace = getattr(meta_config, "namespace", None)
+            datastore_kind = getattr(meta_config, "kind", class_name)
+
+        if not isinstance(datastore_kind, str):
+            raise TypeError("Meta.kind must be a string")
+
         # Collect properties and validators
         for attribute_name, attribute_value in class_attrs.items():
             if isinstance(attribute_value, Property):
@@ -110,10 +123,6 @@ class ModelMeta(type):
                     )
                 collected_field_validators[field_name].append(attribute_name)
 
-        datastore_kind = class_attrs.get("__kind__", class_name)
-        if not isinstance(datastore_kind, str):
-            raise TypeError("__kind__ must be a string")
-
         unindexed = set()
         for py_name, prop in collected_properties.items():
             if not prop.indexed:
@@ -122,6 +131,8 @@ class ModelMeta(type):
         class_attrs["_properties"] = collected_properties
         class_attrs["_model_validators"] = collected_validators
         class_attrs["_field_validators"] = dict(collected_field_validators)
+        class_attrs["_project"] = datastore_project
+        class_attrs["_namespace"] = datastore_namespace
         class_attrs["_kind"] = datastore_kind
         class_attrs["_unindexed_datastore_names"] = frozenset(unindexed)
 
@@ -140,6 +151,8 @@ class Model(metaclass=ModelMeta):
     _properties: ClassVar[Dict[str, Property]] = {}
     _model_validators: ClassVar[List[Callable]] = []
     _field_validators: ClassVar[Dict[str, List[str]]] = {}
+    _project: ClassVar[Optional[str]] = None
+    _namespace: ClassVar[Optional[str]] = None
     _kind: ClassVar[str]
     _unindexed_datastore_names: ClassVar[frozenset[str]] = frozenset()
 
@@ -149,7 +162,7 @@ class Model(metaclass=ModelMeta):
     def _get_kwarg_or_alias(cls, kwargs: Dict[str, Any], keyword: str, default: Any = None) -> Any:
         """Extract Datastore routing metadata (id, parent) safely.
 
-        If the user defined a property with a reserved name, they must use the 
+        If the user defined a property with a reserved name, they must use the
         `_` prefix (e.g., `_id=...`) to route to the Datastore Key.
         """
         alt_keyword = f"_{keyword}"
@@ -165,13 +178,14 @@ class Model(metaclass=ModelMeta):
         """Initialize a new model instance.
 
         Properties can be passed as keyword arguments. To explicitly set the Datastore key
-        components, use the `id`, `parent`, or `key` kwargs. If your model has a property
-        named `id` or `parent`, prefix the routing kwargs with an underscore (`_id`, `_parent`).
+        components, use the `id`, `parent`, or `key` kwargs. To explicitly set routing metadata use `project` and
+        `namespace` kwargs. If your model has an actual property named after those keywords,
+         prefix the routing kwargs with an underscore (`_id`, `_parent`, `_project`, `_namespace`).
         'key' is reserved and prohibited from being used as a property name but if you have an actual Datastore
         field called 'key' you can still access it by using the alias feature.
 
         Args:
-            **kwargs: Property values and Datastore routing metadata (`id`, `parent`, `key`).
+            **kwargs: Property values and Datastore routing metadata (`id`, `parent`, `key`, `project`, `namespace`).
 
         Raises:
             ValueError: If a required property is missing.
@@ -181,14 +195,25 @@ class Model(metaclass=ModelMeta):
 
         _id = self._get_kwarg_or_alias(kwargs, "id")
         parent = self._get_kwarg_or_alias(kwargs, "parent")
+        project = self._get_kwarg_or_alias(kwargs, "project")
+        namespace = self._get_kwarg_or_alias(kwargs, "namespace")
         key = kwargs.pop("key", None)
 
         if _id is not None:
-            self.key = self.key_from_id(_id, parent=parent)
+            self.key = self.key_from_id(_id, parent=parent, project=project, namespace=namespace)
         else:
             self.key = key
-            if self.key is None and parent is not None:
-                self.key = self.client().key(self._kind, parent=parent)
+            if self.key is None and (parent is not None or project is not None or namespace is not None):
+                resolved_proj = project if project is not None else self._project
+                resolved_ns = namespace if namespace is not None else self._namespace
+
+                key_kwargs = {}
+                if parent:
+                    key_kwargs["parent"] = parent
+                if resolved_ns:
+                    key_kwargs["namespace"] = resolved_ns
+
+                self.key = self.client(project=resolved_proj).key(self._kind, **key_kwargs)
 
         for property_name, _property in self._properties.items():
             if property_name in kwargs:
@@ -210,13 +235,32 @@ class Model(metaclass=ModelMeta):
 
     def __repr__(self) -> str:
         """Return a string representation of the model instance."""
+        meta_parts = []
+
+        if self._kind != self.__class__.__name__:
+            meta_parts.append(f"kind={self._kind!r}")
+
+        _key = self.key
+        if _key and _key.id_or_name:
+            meta_parts.append(f"id={_key.id_or_name!r}")
+            if _key.namespace and _key.namespace != self.client().namespace:
+                meta_parts.append(f"namespace={_key.namespace!r}")
+            if _key.project and _key.project != self.client().project:
+                meta_parts.append(f"project={_key.project!r}")
+
+        key_part = " ".join(meta_parts)
+
         property_repr = ", ".join(
             f"{name}={value!r}" for name, value in self._values.items()
         )
-        key_part = ""
-        if self.key and self.key.id_or_name:
-            key_part = f" id={self.key.id_or_name!r}"
-        return f"<{self.__class__.__name__}{key_part} {property_repr}>"
+
+        parts = [self.__class__.__name__]
+        if key_part:
+            parts.append(key_part)
+        if property_repr:
+            parts.append(property_repr)
+
+        return f"<{' '.join(parts)}>"
 
     def __eq__(self, other: Any) -> bool:
         """Strictly compare two entities for equality.
@@ -339,17 +383,14 @@ class Model(metaclass=ModelMeta):
                 f"Unknown output format '{output_format}'. Must be one of {valid_formats}"
             )
 
-    @property
-    def has_complete_key(self) -> bool:
-        """Check if the model has a fully resolved Datastore key.
-
-        Returns:
-            bool: True if the key exists and contains an ID or name, False otherwise.
-        """
-        return self.key is not None and not self.key.is_partial
-
     @classmethod
-    def allocate_ids(cls, size: int, parent: Optional[datastore.Key] = None) -> List[datastore.Key]:
+    def allocate_ids(
+            cls,
+            size: int,
+            parent: Optional[datastore.Key] = None,
+            project: Optional[str] = None,
+            namespace: Optional[str] = None
+    ) -> List[datastore.Key]:
         """Allocate a batch of integer IDs for this model's kind.
 
         Reserves a block of numeric IDs directly from the Datastore backend. This is
@@ -358,6 +399,8 @@ class Model(metaclass=ModelMeta):
         Args:
             size (int): The number of IDs to allocate. Must be > 0.
             parent (Optional[datastore.Key]): An optional ancestor key for the allocated IDs.
+            project (Optional[str]): An optional project override.
+            namespace (Optional[str]): An optional namespace override.
 
         Returns:
             List[datastore.Key]: A list of fully resolved keys with allocated integer IDs.
@@ -368,8 +411,19 @@ class Model(metaclass=ModelMeta):
         if size <= 0:
             raise ValueError("Number of IDs to allocate must be greater than 0.")
 
-        client = cls.client()
-        incomplete_key = client.key(cls._kind, parent=parent)
+        resolved_proj = project if project is not None else cls._project
+        client = cls.client(project=resolved_proj)
+
+        kwargs = {}
+
+        resolved_ns = namespace if namespace is not None else cls._namespace
+        if resolved_ns:
+            kwargs["namespace"] = resolved_ns
+
+        if parent:
+            kwargs["parent"] = parent
+
+        incomplete_key = client.key(cls._kind, **kwargs)
         return client.allocate_ids(incomplete_key, num_ids=size)
 
     def allocate_key(self, parent: Optional[datastore.Key] = None) -> datastore.Key:
@@ -383,9 +437,17 @@ class Model(metaclass=ModelMeta):
         Returns:
             datastore.Key: The newly allocated, fully resolved Key.
         """
-        if not self.has_complete_key:
+        if self.key is None or self.key.is_partial:
+            actual_proj = self.key.project if self.key else self._project
+            actual_ns = self.key.namespace if self.key else self._namespace
             actual_parent = parent or (self.key.parent if self.key else None)
-            self.key = self.allocate_ids(size=1, parent=actual_parent)[0]
+
+            self.key = self.allocate_ids(
+                size=1,
+                parent=actual_parent,
+                project=actual_proj,
+                namespace=actual_ns
+            )[0]
 
         return self.key
 
@@ -396,29 +458,48 @@ class Model(metaclass=ModelMeta):
         the ID natively during the put() operation.
         """
         if self.key is None:
-            self.key = self.client().key(self._kind)
+            kwargs = {}
+
+            if self._namespace:
+                kwargs["namespace"] = self._namespace
+
+            self.key = self.client(project=self._project).key(self._kind, **kwargs)
 
     @classmethod
-    def client(cls) -> datastore.Client:
+    def client(cls, project: Optional[str] = None) -> datastore.Client:
         """Retrieve the configured active Datastore client."""
-        return get_client()
+        return get_client(project=project)
 
     @classmethod
     def key_from_id(
             cls,
             identifier: Any,
             parent: Optional[datastore.Key] = None,
+            project: Optional[str] = None,
+            namespace: Optional[str] = None
     ) -> datastore.Key:
         """Construct a datastore Key for this model's kind.
 
         Args:
             identifier (Any): The string or integer ID for the entity.
             parent (Optional[datastore.Key]): An optional ancestor key.
+            project (Optional[str]): An optional project override.
+            namespace (Optional[str]): An optional namespace override.
 
         Returns:
             datastore.Key: The constructed Key object.
         """
-        return cls.client().key(cls._kind, identifier, parent=parent)
+        kwargs = {}
+        if parent:
+            kwargs["parent"] = parent
+
+        resolved_proj = project if project is not None else cls._project
+
+        resolved_ns = namespace if namespace is not None else cls._namespace
+        if resolved_ns:
+            kwargs["namespace"] = resolved_ns
+
+        return cls.client(project=resolved_proj).key(cls._kind, identifier, **kwargs)
 
     def populate(self, **kwargs: Any) -> None:
         """Update multiple properties at once.
@@ -472,7 +553,7 @@ class Model(metaclass=ModelMeta):
 
         Args:
             key (datastore.Key): The key that was requested.
-            instance (Optional[Model]): The hydrated model instance, or None if the 
+            instance (Optional[Model]): The hydrated model instance, or None if the
                 entity did not exist in the Datastore.
         """
         pass
@@ -509,7 +590,8 @@ class Model(metaclass=ModelMeta):
             Optional[Model]: The hydrated model instance, or None if not found.
         """
         cls._pre_get_hook(key)
-        entity = cls.client().get(key)
+        client = cls.client(project=key.project)
+        entity = client.get(key)
 
         instance = cls.from_entity(entity) if entity else None
         cls._post_get_hook(key, instance)
@@ -530,13 +612,24 @@ class Model(metaclass=ModelMeta):
         return cls.get(cls.key_from_id(identifier, parent))
 
     @classmethod
-    def query(cls) -> Query:
+    def query(
+            cls,
+            project: Optional[str] = None,
+            namespace: Optional[str] = None
+    ) -> Query:
         """Create a Query object for this model's Datastore kind.
+
+        Args:
+            project (Optional[str]): An optional project override.
+            namespace (Optional[str]): An optional namespace override.
 
         Returns:
             Query: An ODM Query object ready for filtering and fetching.
         """
-        return Query(cls)
+        resolved_proj = project if project is not None else cls._project
+        resolved_ns = namespace if namespace is not None else cls._namespace
+
+        return Query(cls, project=resolved_proj, namespace=resolved_ns)
 
     def put(self, exclude_from_indexes: Optional[List[str]] = None) -> datastore.Key:
         """Persist the model instance to the Datastore.
@@ -556,7 +649,7 @@ class Model(metaclass=ModelMeta):
         self._ensure_key()
         self._pre_put_hook()
 
-        client = self.client()
+        client = self.client(project=self.key.project)
 
         unindexed_names = set(self._unindexed_datastore_names)
 
@@ -601,7 +694,7 @@ class Model(metaclass=ModelMeta):
             raise ValueError("Cannot delete an entity that does not have a key.")
 
         self._pre_delete_hook(self.key)
-        self.client().delete(self.key)
+        self.client(project=self.key.project).delete(self.key)
         self._post_delete_hook(self.key)
 
     @classmethod
@@ -620,10 +713,15 @@ class Model(metaclass=ModelMeta):
         if not keys:
             return []
 
+        project = keys[0].project
+        if any(k.project != project for k in keys):
+            raise ValueError("All keys in a get_multi operation must belong to the same project.")
+
         for key in keys:
             cls._pre_get_hook(key)
 
-        client = cls.client()
+        client = cls.client(project=project)
+
         entities = client.get_multi(keys)
         entity_map = {e.key: e for e in entities}
 
@@ -652,7 +750,14 @@ class Model(metaclass=ModelMeta):
         if not instances:
             return []
 
-        client = cls.client()
+        for instance in instances:
+            instance._ensure_key()
+
+        project = instances[0].key.project
+        if any(inst.key.project != project for inst in instances):
+            raise ValueError("All instances in a put_multi operation must belong to the same project.")
+
+        client = cls.client(project=project)
         entities_to_put = []
 
         # Use the pre-computed schema-level index exclusions for maximum speed
@@ -660,7 +765,6 @@ class Model(metaclass=ModelMeta):
 
         for instance in instances:
             instance.validate()
-            instance._ensure_key()
             instance._pre_put_hook()
 
             entity = datastore.Entity(
@@ -696,10 +800,14 @@ class Model(metaclass=ModelMeta):
         if not keys:
             return
 
+        project = keys[0].project
+        if any(k.project != project for k in keys):
+            raise ValueError("All keys in a delete_multi operation must belong to the same project.")
+
         for key in keys:
             cls._pre_delete_hook(key)
 
-        cls.client().delete_multi(keys)
+        cls.client(project=project).delete_multi(keys)
 
         for key in keys:
             cls._post_delete_hook(key)
