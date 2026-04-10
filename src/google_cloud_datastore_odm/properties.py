@@ -6,6 +6,7 @@ This module provides the base `Property` descriptor and its type-specific subcla
 validation, default values, and Datastore schema mapping.
 """
 
+import datetime
 import json
 from typing import TYPE_CHECKING, Any, Callable, List, Optional
 
@@ -215,6 +216,23 @@ class Property:
         """
         return value
 
+    def _to_base_type(self, value: Any) -> Any:
+        """
+        Convert a value from the Python user type to the Datastore base type.
+
+        By default, this is a simple pass-through. Subclasses can override this
+        to cast data (e.g. casting a `date` to a `datetime`) before saving.
+        """
+        return value
+
+    def _prepare_for_put(self, instance: "Model") -> None:
+        """
+        Hook that runs immediately before an instance is saved to Datastore.
+
+        Useful for properties like DateTimeProperty to implement `auto_now`.
+        """
+        pass
+
 
 class StringProperty(Property):
     """A Datastore property that strictly enforces string values."""
@@ -356,3 +374,116 @@ class JsonProperty(Property):
             return None
 
         return json.loads(json.dumps(value))
+
+
+class DateTimeProperty(Property):
+    """A Datastore property that enforces datetime values.
+
+    If `tzinfo` is None, this expects naive datetimes and assumes UTC.
+    If `tzinfo` is provided, it converts Datastore's UTC datetimes to that timezone.
+    """
+
+    def __init__(
+            self,
+            *,
+            auto_now: bool = False,
+            auto_now_add: bool = False,
+            tzinfo: Optional[datetime.tzinfo] = None,
+            **kwargs: Any
+    ):
+        self.auto_now = auto_now
+        self.auto_now_add = auto_now_add
+        self.tzinfo = tzinfo
+
+        if kwargs.get('repeated') and (auto_now or auto_now_add):
+            raise ValueError("auto_now and auto_now_add are incompatible with repeated properties.")
+
+        super().__init__(**kwargs)
+
+    def _prepare_for_put(self, instance: "Model") -> None:
+        """Execute auto_now and auto_now_add logic."""
+        if self.auto_now or (self.auto_now_add and getattr(instance, self._python_name) is None):
+            now = datetime.datetime.now(self.tzinfo or datetime.timezone.utc)
+            if self.tzinfo is None:
+                now = now.replace(tzinfo=None)
+            setattr(instance, self._python_name, now)
+
+    def _validate_type(self, value: Any) -> Any:
+        """Enforce that the value is a datetime."""
+        if not isinstance(value, datetime.datetime):
+            raise TypeError(f"Property '{self._python_name}' must be a datetime.datetime")
+        if self.tzinfo is None and value.tzinfo is not None:
+            raise ValueError(
+                f"DateTimeProperty '{self._python_name}' without tzinfo can only support "
+                f"naive datetimes (presumed UTC).")
+        return value
+
+    def _from_base_type(self, value: Any) -> Any:
+        """Convert Datastore's UTC datetime to the expected timezone/naive state."""
+        if value is None:
+            return None
+
+        if self.tzinfo is not None:
+            if value.tzinfo is None:
+                value = value.replace(tzinfo=datetime.timezone.utc)
+            return value.astimezone(self.tzinfo)
+        else:
+            if value.tzinfo is not None:
+                return value.replace(tzinfo=None)
+
+        return value
+
+
+class DateProperty(DateTimeProperty):
+    """A Datastore property that enforces date values.
+
+    Datastore only supports Datetimes, so this property casts to a Datetime
+    at midnight UTC before saving, and casts back to a Date when reading.
+    """
+
+    def _validate_type(self, value: Any) -> Any:
+        if not isinstance(value, datetime.date) or isinstance(value, datetime.datetime):
+            raise TypeError(f"Property '{self._python_name}' must be a datetime.date")
+        return value
+
+    def _to_base_type(self, value: Any) -> Any:
+        if value is None:
+            return None
+        return datetime.datetime(value.year, value.month, value.day, tzinfo=datetime.timezone.utc)
+
+    def _from_base_type(self, value: Any) -> Any:
+        if value is None:
+            return None
+        return value.date()
+
+    def _prepare_for_put(self, instance: "Model") -> None:
+        if self.auto_now or (self.auto_now_add and getattr(instance, self._python_name) is None):
+            setattr(instance, self._python_name, datetime.datetime.now(datetime.timezone.utc).date())
+
+
+class TimeProperty(DateTimeProperty):
+    """A Datastore property that enforces time values.
+
+    Datastore only supports Datetimes, so this property casts to a Datetime
+    on Jan 1, 1970 UTC before saving, and casts back to a Time when reading.
+    """
+
+    def _validate_type(self, value: Any) -> Any:
+        if not isinstance(value, datetime.time):
+            raise TypeError(f"Property '{self._python_name}' must be a datetime.time")
+        return value
+
+    def _to_base_type(self, value: Any) -> Any:
+        if value is None:
+            return None
+        return datetime.datetime(1970, 1, 1, value.hour, value.minute, value.second, value.microsecond,
+                                 tzinfo=datetime.timezone.utc)
+
+    def _from_base_type(self, value: Any) -> Any:
+        if value is None:
+            return None
+        return value.time()
+
+    def _prepare_for_put(self, instance: "Model") -> None:
+        if self.auto_now or (self.auto_now_add and getattr(instance, self._python_name) is None):
+            setattr(instance, self._python_name, datetime.datetime.now(datetime.timezone.utc).time())

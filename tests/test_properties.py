@@ -1,15 +1,20 @@
+import datetime
+
 import pytest
 from google.cloud import datastore
 
 from src.google_cloud_datastore_odm.model import Model, field_validator
 from src.google_cloud_datastore_odm.properties import (
     BooleanProperty,
+    DateProperty,
+    DateTimeProperty,
     FloatProperty,
     IntegerProperty,
     JsonProperty,
     Property,
     StringProperty,
     TextProperty,
+    TimeProperty,
 )
 
 
@@ -329,3 +334,170 @@ def test_model_from_entity_with_none():
 
     instance = DummyModel.from_entity(None)
     assert instance is None
+
+
+def test_datetime_auto_now_add():
+    class TimeModel(Model):
+        created_at = DateTimeProperty(auto_now_add=True)
+        updated_at = DateTimeProperty(auto_now=True)
+        time_auto = TimeProperty(auto_now=True)
+
+    instance = TimeModel()
+
+    TimeModel._properties['created_at']._prepare_for_put(instance)
+    TimeModel._properties['updated_at']._prepare_for_put(instance)
+    TimeModel._properties['time_auto']._prepare_for_put(instance)
+
+    assert isinstance(instance.created_at, datetime.datetime)
+    assert isinstance(instance.updated_at, datetime.datetime)
+    assert isinstance(instance.time_auto, datetime.time)
+
+
+def test_date_and_time_property_casting():
+    class SchedModel(Model):
+        day = DateProperty()
+        hour = TimeProperty()
+
+    instance = SchedModel()
+    instance.day = datetime.date(2025, 1, 1)
+    instance.hour = datetime.time(14, 30)
+
+    with pytest.raises(TypeError):
+        instance.day = datetime.datetime.now()
+
+    # noinspection PyProtectedMember
+    ds_day = SchedModel._properties['day']._to_base_type(instance.day)
+    assert isinstance(ds_day, datetime.datetime)
+    assert ds_day.year == 2025
+
+    # noinspection PyProtectedMember
+    py_day = SchedModel._properties['day']._from_base_type(ds_day)
+    assert isinstance(py_day, datetime.date)
+
+    # noinspection PyProtectedMember
+    ds_hour = SchedModel._properties['hour']._to_base_type(instance.hour)
+    assert isinstance(ds_hour, datetime.datetime)
+    assert ds_hour.year == 1970
+    assert ds_hour.hour == 14
+
+    # noinspection PyProtectedMember
+    py_hour = SchedModel._properties['hour']._from_base_type(ds_hour)
+    assert isinstance(py_hour, datetime.time)
+
+    # --- None Casts (Covering the early exit branches) ---
+    # noinspection PyProtectedMember
+    assert SchedModel._properties['day']._to_base_type(None) is None
+    # noinspection PyProtectedMember
+    assert SchedModel._properties['day']._from_base_type(None) is None
+    # noinspection PyProtectedMember
+    assert SchedModel._properties['hour']._to_base_type(None) is None
+    # noinspection PyProtectedMember
+    assert SchedModel._properties['hour']._from_base_type(None) is None
+
+
+def test_datetime_hydration_conversions():
+    """Test naive/aware timezone conversions during Datastore hydration."""
+
+    class TzModel(Model):
+        dt_aware = DateTimeProperty(tzinfo=datetime.timezone.utc)
+        dt_naive = DateTimeProperty()
+        d = DateProperty()
+        t = TimeProperty()
+
+    ds_entity = datastore.Entity()
+
+    utc_now = datetime.datetime(2025, 1, 1, 12, 0, tzinfo=datetime.timezone.utc)
+
+    ds_entity.update({
+        "dt_aware": datetime.datetime(2025, 1, 1, 12, 0),
+        "dt_naive": utc_now,
+        "d": utc_now,
+        "t": utc_now,
+    })
+
+    instance = TzModel.from_entity(ds_entity)
+
+    assert instance.dt_aware.tzinfo == datetime.timezone.utc
+    assert instance.dt_naive.tzinfo is None
+    assert isinstance(instance.d, datetime.date)
+    assert isinstance(instance.t, datetime.time)
+
+
+def test_datetime_and_time_edge_cases_via_model():
+    """Test Datetime/Date/Time edge cases using high-level model API."""
+
+    with pytest.raises(ValueError):
+        class BadModel(Model):
+            dt = DateTimeProperty(repeated=True, auto_now=True)
+
+    class ChronoModel(Model):
+        dt_naive = DateTimeProperty()
+        dt_aware = DateTimeProperty(tzinfo=datetime.timezone.utc)
+        d = DateProperty()
+        t = TimeProperty()
+
+    instance = ChronoModel()
+
+    with pytest.raises(TypeError):
+        instance.dt_naive = "not a datetime"
+
+    with pytest.raises(TypeError):
+        instance.d = datetime.datetime.now()
+
+    with pytest.raises(TypeError):
+        instance.t = datetime.datetime.now()
+
+    with pytest.raises(ValueError):
+        instance.dt_naive = datetime.datetime.now(datetime.timezone.utc)
+
+    # noinspection PyProtectedMember
+    assert ChronoModel._properties['dt_naive']._from_base_type(None) is None
+
+    class BypassModel(Model):
+        created_at = DateProperty(auto_now_add=True)
+        time_at = TimeProperty(auto_now_add=True)
+
+    explicit_date = datetime.date(2020, 1, 1)
+    explicit_time = datetime.time(12, 0)
+    bypass_instance = BypassModel(created_at=explicit_date, time_at=explicit_time)
+
+    for prop in BypassModel._properties.values():
+        # noinspection PyProtectedMember
+        prop._prepare_for_put(bypass_instance)
+
+    assert bypass_instance.created_at == explicit_date
+    assert bypass_instance.time_at == explicit_time
+
+
+def test_datetime_naive_to_naive_pass_through():
+    """Cover the final 'return value' branch in DateTimeProperty._from_base_type."""
+
+    class NaiveModel(Model):
+        dt = DateTimeProperty()  # tzinfo is None
+
+    # Simulate Datastore (or a mock) returning a naive datetime
+    naive_val = datetime.datetime(2025, 1, 1, 12, 0)
+
+    # noinspection PyProtectedMember
+    result = NaiveModel._properties['dt']._from_base_type(naive_val)
+
+    # It should pass straight through untouched
+    assert result.tzinfo is None
+    assert result == naive_val
+
+
+def test_date_and_time_auto_now_add_triggers():
+    """Cover the setattr execution in DateProperty and TimeProperty _prepare_for_put."""
+
+    class AutoModel(Model):
+        d = DateProperty(auto_now_add=True)
+        t = TimeProperty(auto_now_add=True)
+
+    instance = AutoModel()
+
+    for prop in AutoModel._properties.values():
+        # noinspection PyProtectedMember
+        prop._prepare_for_put(instance)
+
+    assert isinstance(instance.d, datetime.date)
+    assert isinstance(instance.t, datetime.time)

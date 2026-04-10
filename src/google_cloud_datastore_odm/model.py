@@ -573,10 +573,14 @@ class Model(metaclass=ModelMeta):
         )
 
         for py_name, prop in self._properties.items():
+            # noinspection PyProtectedMember
+            prop._prepare_for_put(self)
+
             value = self._values.get(py_name)
 
             if value is not None:
-                entity[prop.datastore_name] = value
+                # noinspection PyProtectedMember
+                entity[prop.datastore_name] = prop._to_base_type(value)
 
         client.put(entity)
         self.key = entity.key
@@ -665,9 +669,12 @@ class Model(metaclass=ModelMeta):
             )
 
             for py_name, prop in cls._properties.items():
+                # noinspection PyProtectedMember
+                prop._prepare_for_put(instance)
                 value = instance._values.get(py_name)
                 if value is not None:
-                    entity[prop.datastore_name] = value
+                    # noinspection PyProtectedMember
+                    entity[prop.datastore_name] = prop._to_base_type(value)
 
             entities_to_put.append(entity)
 

@@ -64,9 +64,9 @@ https://trebbble.github.io/google-cloud-datastore-odm/
     - [ ] UserProperty
     - [ ] KeyProperty
     - [ ] BlobKeyProperty
-    - [ ] DateTimeProperty
-    - [ ] DateProperty
-    - [ ] TimeProperty
+    - [x] DateTimeProperty
+    - [x] DateProperty
+    - [x] TimeProperty
     - [ ] StructuredProperty
     - [ ] LocalStructuredProperty
     - [ ] GenericProperty

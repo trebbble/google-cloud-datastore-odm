@@ -6,18 +6,22 @@ To run this locally, you need:
   - A .env file with: DATASTORE_EMULATOR_HOST=localhost:10000 and GOOGLE_CLOUD_PROJECT=google-cloud-datastore-odm-dev
 """
 
+import datetime
 import json
 
 from dotenv import load_dotenv
 
 from src.google_cloud_datastore_odm import (
     BooleanProperty,
+    DateProperty,
+    DateTimeProperty,
     FloatProperty,
     IntegerProperty,
     JsonProperty,
     Model,
     StringProperty,
     TextProperty,
+    TimeProperty,
 )
 from src.google_cloud_datastore_odm.model import field_validator, model_validator
 
@@ -51,6 +55,12 @@ class Article(Model):
     is_featured = BooleanProperty(default=False)
     score = FloatProperty()
 
+    # Chronological properties with auto-population and timezone awareness
+    created_at = DateTimeProperty(auto_now_add=True, tzinfo=datetime.timezone.utc)
+    updated_at = DateTimeProperty(auto_now=True, tzinfo=datetime.timezone.utc)
+    publish_date = DateProperty()
+    publish_time = TimeProperty()
+
     # Repeated list of strings
     tags = StringProperty(repeated=True)
 
@@ -61,7 +71,7 @@ class Article(Model):
     body = TextProperty()
 
     # Automatically unindexed by default (safe for deep dicts/lists)
-    metadata = JsonProperty()
+    metadata: dict | list = JsonProperty()
 
     # -----------------------------------------------------------------------
     # 2. Field-level validators
@@ -164,6 +174,8 @@ article = Article(
     word_count=500,
     is_featured=True,
     score=98.5,
+    publish_date=datetime.date.today(),
+    publish_time=datetime.datetime.now(datetime.timezone.utc).time(),
     tags=["python", "odm"],
     internal_notes="Review again tomorrow.",
     body="This is a very large block of text that won't blow up our indexes.",
@@ -189,7 +201,8 @@ print(f"After dict-style set, status: {article.status}")
 
 print("Iterating over keys:", list(article))
 print("items():", dict(article.items()))
-print("to_dict():", article.to_dict())
+# Notice that created_at and updated_at are None here because .put() hasn't fired yet!
+print("to_dict() before save:", article.to_dict(include=["title", "created_at", "updated_at"]))
 
 
 # ---------------------------------------------------------------------------
@@ -200,7 +213,10 @@ print("\n--- Persistence ---")
 saved_article_key = article.put()
 print(f"Saved article: {article}")
 print(f"Key: {saved_article_key}")
-print(f"Key: {article.key}")
+
+# Now created_at and updated_at have been auto-populated by the _prepare_for_put hook!
+print(f"Auto-generated created_at: {article.created_at}")
+print(f"Auto-generated updated_at: {article.updated_at}")
 
 
 # ---------------------------------------------------------------------------
@@ -213,6 +229,8 @@ print(f"Fetched: {fetched}")
 print(f"Fetched ID: {fetched.key.id_or_name}")
 print(f"Fetched Tags (Repeated): {fetched.tags}")
 print(f"Fetched Metadata (JSON): {fetched.metadata}")
+print(f"Fetched Publish Date: {fetched.publish_date} ({type(fetched.publish_date)})")
+print(f"Fetched Publish Time: {fetched.publish_time} ({type(fetched.publish_time)})")
 
 
 # ---------------------------------------------------------------------------

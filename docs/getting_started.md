@@ -16,7 +16,7 @@ GOOGLE_CLOUD_PROJECT=google-cloud-datastore-odm-dev
 
 ## 2. Defining Models and Properties
 
-Models are defined by inheriting from the `Model` class. You map Datastore fields using property descriptors like `StringProperty` and `IntegerProperty`.
+Models are defined by inheriting from the `Model` class. You map Datastore fields using property descriptors.
 
 * **`__kind__`**: Customizes the Datastore kind (defaults to the class name).
 * **`required` / `default`**: Enforces presence or provides a fallback value.
@@ -26,14 +26,18 @@ Models are defined by inheriting from the `Model` class. You map Datastore field
 * **`name`**: Maps the Python attribute to a legacy/different Datastore column name.
 
 ```python
+import datetime
 from src.google_cloud_datastore_odm import (
     BooleanProperty,
+    DateProperty,
+    DateTimeProperty,
     FloatProperty,
     IntegerProperty,
     JsonProperty,
     Model,
     StringProperty,
     TextProperty,
+    TimeProperty,
 )
 
 class Article(Model):
@@ -47,15 +51,18 @@ class Article(Model):
     word_count = IntegerProperty(default=0)
     is_featured = BooleanProperty(default=False)
     score = FloatProperty()
+    # Chronological properties with auto-population and timezone awareness
+    created_at = DateTimeProperty(auto_now_add=True, tzinfo=datetime.timezone.utc)
+    updated_at = DateTimeProperty(auto_now=True, tzinfo=datetime.timezone.utc)
+    publish_date = DateProperty()
     tags = StringProperty(repeated=True)
     # Unindexed string (cannot be filtered on in queries)
     internal_notes = StringProperty(indexed=False)
     # Automatically unindexed by default (safe for >1500 bytes)
     body = TextProperty()
     # Automatically unindexed by default (safe for deep dicts/lists)
-    metadata = JsonProperty()
+    metadata: dict | list = JsonProperty()
 ```
-
 ## 3. Validation
 
 The ODM provides three distinct layers of validation to ensure bad data never reaches your database.
