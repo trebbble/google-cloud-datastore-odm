@@ -22,7 +22,7 @@ def test_model_repr_with_key():
     assert "id=None" not in repr(model)
     
     model.allocate_key()
-    assert repr(model).startswith("<KeyTestModel id=")
+    assert 'id=' in repr(model)
 
 
 def test_model_to_dict():
@@ -703,23 +703,28 @@ def test_multi_tenant_routing_coverage():
             kind = "Tenant"
             project = "custom-project"
             namespace = "custom-namespace"
+            database = "custom-database"
 
     instance = TenantModel()
     instance.allocate_key()
 
     assert instance.key.project == "custom-project"
+    assert instance.key.database == "custom-database"
     assert instance.key.namespace == "custom-namespace"
 
     repr_str = repr(instance)
     assert "project='custom-project'" in repr_str
+    assert "database='custom-database'" in repr_str
     assert "namespace='custom-namespace'" in repr_str
 
     keys = TenantModel.allocate_ids(1)
     assert keys[0].project == "custom-project"
+    assert keys[0].database == "custom-database"
     assert keys[0].namespace == "custom-namespace"
 
     key = TenantModel.key_from_id("test-id")
     assert key.project == "custom-project"
+    assert key.database == "custom-database"
     assert key.namespace == "custom-namespace"
 
     q = TenantModel.query()

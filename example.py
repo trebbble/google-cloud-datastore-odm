@@ -425,6 +425,7 @@ class SystemLog(Model):
     class Meta:
         kind = "AuditLog"
         project = "central-logging-system"
+        database = "db-1"
         namespace = "default-events"
 
 
@@ -432,6 +433,7 @@ log_default = SystemLog(event="Startup", user_id="system")
 log_default.put()
 print(f"Saved default log: "
       f"project={log_default.key.project}, "
+      f"database={log_default.key.database}, "
       f"namespace={log_default.key.namespace}, "
       f"kind={log_default.key.kind}")
 print(log_default)
@@ -441,17 +443,23 @@ log_tenant = SystemLog(
     event="Login",
     user_id="alice",
     project="customer-project-123",
+    database="db-2",
     namespace="tenant-b"
 )
 log_tenant.put()
-print(f"Saved ad-hoc log: project={log_tenant.key.project}, namespace={log_tenant.key.namespace}")
+print(f"Saved ad-hoc log: "
+      f"project={log_tenant.key.project}, "
+      f"database={log_tenant.key.database}, "
+      f"namespace={log_tenant.key.namespace}, "
+      f"kind={log_tenant.key.kind}")
 print(log_tenant)
 
 central_logs = list(SystemLog.query().filter("event", "=", "Startup").fetch())
+
 print(f"Found {len(central_logs)} startup logs in the central project.")
 
 customer_logs = list(
-    SystemLog.query(project="customer-project-123", namespace="tenant-b")
+    SystemLog.query(project="customer-project-123", database='db-2', namespace="tenant-b")
     .filter("user_id", "=", "alice")
     .fetch()
 )

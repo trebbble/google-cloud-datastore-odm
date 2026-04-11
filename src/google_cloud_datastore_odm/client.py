@@ -2,33 +2,35 @@
 Datastore client connection manager for the Google Cloud Datastore ODM.
 
 This module provides a singleton pattern to ensure that only one instance 
-of the `google.cloud.datastore.Client` is created and shared across the 
-entire application lifecycle. This prevents connection overhead and 
-memory leaks.
+of the `google.cloud.datastore.Client` is created per GCP project and database.
+This prevents connection overhead and memory leaks.
 """
 
-from typing import Dict, Optional
+from typing import Dict, Optional, Tuple
 
 from google.cloud import datastore
 
-_clients: Dict[Optional[str], datastore.Client] = {}
+_clients: Dict[Tuple[Optional[str], Optional[str]], datastore.Client] = {}
 
 
-def get_client(project: Optional[str] = None) -> datastore.Client:
+def get_client(project: Optional[str] = None, database: Optional[str] = None) -> datastore.Client:
     """Retrieve the global Google Cloud Datastore client instance.
 
-    If the client for the requested project has not been initialized yet,
-    this function will create a new instance. If `project` is None, it
-    automatically infers the Google Cloud Project ID and credentials
-    from the environment.
+    If the client for the requested project/database has not been initialized yet,
+    this function will create a new instance. If `project` or `database` is None, it
+    automatically infers the defaults from the environment.
 
     Args:
         project (Optional[str]): The specific GCP project ID to connect to.
+        database (Optional[str]): The specific Datastore database name to connect to.
 
     Returns:
         datastore.Client: The active Datastore client connection.
     """
     global _clients
-    if project not in _clients:
-        _clients[project] = datastore.Client(project=project)
-    return _clients[project]
+    cache_key = (project, database)
+
+    if cache_key not in _clients:
+        _clients[cache_key] = datastore.Client(project=project, database=database)
+
+    return _clients[cache_key]

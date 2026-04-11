@@ -347,6 +347,7 @@ class SystemLog(Model):
         kind = "AuditLog"
         project = "central-logging-system"
         namespace = "default-events"
+        database = 'db-1'
 
 # Statically routed: Uses the Meta class defaults
 log_default = SystemLog(event="Startup", user_id="system")
@@ -359,7 +360,8 @@ log_tenant = SystemLog(
     event="Login", 
     user_id="alice", 
     project="customer-project-123", 
-    namespace="tenant-b"
+    namespace="tenant-b",
+    database="db-2"
 )
 log_tenant.put()
 
@@ -369,7 +371,7 @@ central_logs = list(SystemLog.query().filter("event", "=", "Startup").fetch())
 
 # Queries the ad-hoc customer project/namespace:
 customer_logs = list(
-    SystemLog.query(project="customer-project-123", namespace="tenant-b")
+    SystemLog.query(project="customer-project-123", namespace="tenant-b", database="db-2")
     .filter("user_id", "=", "alice")
     .fetch()
 )

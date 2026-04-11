@@ -17,7 +17,8 @@ if TYPE_CHECKING:
 
 
 class Query:
-    """A fluent query builder for Datastore entities.
+    """
+    A fluent query builder for Datastore entities.
 
     This class wraps the native `google.cloud.datastore.Query` object, providing
     a chainable interface for adding filters. When executed via `fetch()`,
@@ -28,18 +29,22 @@ class Query:
             self,
             model_cls: "type[Model]",
             project: Optional[str] = None,
-            namespace: Optional[str] = None
+            database: Optional[str] = None,
+            namespace: Optional[str] = None,
     ):
-        """Initialize a new Query for a specific model kind.
+        """
+        Initialize a new Query for a specific model kind.
 
         Args:
             model_cls (type[Model]): The Model class this query will return instances of.
                 The query automatically targets the kind associated with this class.
             project (Optional[str]): An optional project override.
+            database (Optional[str]): An optional database override.
             namespace (Optional[str]): An optional namespace override.
         """
         self.model_cls = model_cls
         self.project = project
+        self.database = database
         self.namespace = namespace
         self._filters: list[tuple[str, str, Any]] = []
 
@@ -93,7 +98,7 @@ class Query:
                 print(article.title)
             ```
         """
-        client = get_client(project=self.project)
+        client = get_client(project=self.project, database=self.database)
         kwargs = {}
 
         if self.namespace:
