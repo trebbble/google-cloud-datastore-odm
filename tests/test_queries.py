@@ -1,5 +1,5 @@
 import pytest
-from google.cloud.datastore import query, Key
+from google.cloud.datastore import Key, query
 
 from src.google_cloud_datastore_odm import AND, OR, IntegerProperty, Model, StringProperty
 from src.google_cloud_datastore_odm.query import CompositeNode, FilterNode, Node, OrderNode, Query

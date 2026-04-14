@@ -108,7 +108,6 @@ https://trebbble.github.io/google-cloud-datastore-odm/
 - [ ] Warnings for queries on unindexed properties (for normal filters or even projections)
 
 ### Persistence & Operations
-- [ ] Context
 - [ ] Transactions
 - [ ] Cache
 
