@@ -780,3 +780,30 @@ def test_ensure_key_with_meta_namespace():
     instance._ensure_key()
     assert instance.key is not None
     assert instance.key.namespace == "test-namespace"
+
+
+def test_put_projected_entity_raises_error():
+    """Ensure calling put() on a projected entity raises a RuntimeError to prevent data loss."""
+
+    class ProjectedModel(Model):
+        name = StringProperty()
+        age = IntegerProperty()
+
+    instance = ProjectedModel(name="Alice", _is_projected=True)
+
+    with pytest.raises(RuntimeError, match="Cannot save an entity fetched via a Projection query"):
+        instance.put()
+
+
+def test_put_multi_projected_entity_raises_error():
+    """Ensure calling put_multi() with any projected entity raises a RuntimeError."""
+
+    class ProjectedModel(Model):
+        name = StringProperty()
+        age = IntegerProperty()
+
+    normal_instance = ProjectedModel(name="Bob", age=30)
+    projected_instance = ProjectedModel(name="Alice", _is_projected=True)
+
+    with pytest.raises(RuntimeError, match="Cannot save an entity fetched via a Projection query"):
+        ProjectedModel.put_multi([normal_instance, projected_instance])

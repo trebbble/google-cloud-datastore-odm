@@ -36,4 +36,5 @@ def test_missing_required_field_raises():
         test_string_field = StringProperty(required=True)
 
     with pytest.raises(ValueError):
-        Dummy()
+        d = Dummy()
+        d.put()

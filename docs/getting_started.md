@@ -216,6 +216,25 @@ ordered_query = Article.query().filter(Article.status == "published").order(-Art
 
 # Fast Server-Side Count Aggregation (Does not download entities)
 total_published = Article.query().filter(Article.status == "published").count()
+
+# --- Advanced Querying ---
+
+# The NDB-style .get() method (Returns the first matching entity or None)
+first_draft = Article.query().filter(Article.status == "draft").get()
+
+# Keys-Only Queries (Extremely fast, does not download document payloads)
+# Yields google.cloud.datastore.Key objects instead of Model instances
+all_article_keys = list(Article.query().fetch(keys_only=True))
+
+# Projection Queries (Download only specific fields to save memory/bandwidth)
+# accepts Properties or raw datastore fields as strings
+# Note: Accessing unprojected fields (like 'word_count') on these objects will safely raise an AttributeError.
+# Attempting to .put() a projected entity will raise a RuntimeError to prevent data loss.
+lightweight_articles = list(Article.query().fetch(projection=[Article.author, Article.status, 'word_count']))
+
+# Distinct Queries (Get unique categories - MUST be used with projection)
+# accepts Properties or raw datastore fields as strings
+unique_authors = list(Article.query().fetch(projection=[Article.author, 'status'], distinct=True))
 ```
 
 ## 6. Strict Equality

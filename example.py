@@ -257,30 +257,8 @@ print(f"Is 'fetched_by_id' equal to 'article'? {fetched_by_id == article}")
 fetched_by_id.title = "A New Title in Memory"
 print(f"Are they equal after modifying one's title? {fetched_by_id == article}")
 
-
 # ---------------------------------------------------------------------------
-# 12. Query passthrough (.query().filter().fetch())
-# ---------------------------------------------------------------------------
-
-print("\n--- Queries ---")
-Article(title="Tutorial: Python ODM", author="John", status="published", word_count=1200, tags=["tutorial"]).put()
-Article(title="Advanced Queries", author="Alicia", status="published", word_count=800, tags=["advanced"]).put()
-
-# Note: Datastore filters use the Datastore alias name under the hood,
-# but for now we filter using the mapped names.
-results: list[Article] = list(Article.query().filter("author_name", "=", "Alicia").fetch())
-print(f"Alicia's articles: {len(results)} found")
-for r in results:
-    # Adding an explicit type hint to satisfy PyCharm's static analyzer
-    r: Article
-    print(f"  - {r.title} (status={r.status}, tags={r.tags})")
-
-results_limited: list[Article] = list(Article.query().fetch(limit=2))
-print(f"First 2 articles (limited): {len(results_limited)} returned")
-
-
-# ---------------------------------------------------------------------------
-# 13. Batch Operations (put_multi, get_multi, delete_multi)
+# 12. Batch Operations (put_multi, get_multi, delete_multi)
 # ---------------------------------------------------------------------------
 
 print("\n--- Batch Operations & Deletion ---")
@@ -311,7 +289,7 @@ print(f"Deleted remaining {len(remaining_keys)} articles using delete_multi.")
 
 
 # ---------------------------------------------------------------------------
-# 14. Explicit key allocation (.allocate_key, .allocate_ids)
+# 13. Explicit key allocation (.allocate_key, .allocate_ids)
 # ---------------------------------------------------------------------------
 
 print("\n--- Key Allocation ---")
@@ -331,7 +309,7 @@ for k in reserved_keys:
 
 
 # ---------------------------------------------------------------------------
-# 15. Model kind introspection
+# 14. Model kind introspection
 # ---------------------------------------------------------------------------
 
 print("\n--- Introspection ---")
@@ -345,7 +323,7 @@ print(f"Article properties aliases: {json.dumps(Article.get_schema(output_format
 
 
 # ---------------------------------------------------------------------------
-# 16. Validation errors
+# 15. Validation errors
 # ---------------------------------------------------------------------------
 
 print("\n--- Validation Examples ---")
@@ -372,7 +350,7 @@ except ValueError as e:
 
 
 # ---------------------------------------------------------------------------
-# 17. Lifecycle Hooks
+# 16. Lifecycle Hooks
 # ---------------------------------------------------------------------------
 
 print("\n--- Lifecycle Hooks ---")
@@ -417,7 +395,7 @@ fetched_task.delete()
 
 
 # ---------------------------------------------------------------------------
-# 18. Cross-Project Routing & Multi-Tenancy
+# 17. Cross-Project Routing & Multi-Tenancy
 # ---------------------------------------------------------------------------
 
 print("\n--- Cross-Project & Multi-Tenant Routing ---")
@@ -472,7 +450,7 @@ print(f"Found {len(customer_logs)} logs for Alicia in customer-project-123.")
 
 
 # ---------------------------------------------------------------------------
-# 19. Advanced NDB-Style Queries & Aggregations
+# 18. Advanced NDB-Style Queries & Aggregations
 # ---------------------------------------------------------------------------
 
 print("\n--- 19. Advanced NDB-Style Queries ---")
@@ -604,5 +582,49 @@ print("  [Log] Executing CountAggregation (No payload download):")
 total_published = Article.query().filter(Article.status == "published").count()
 print(f"    -> Total published articles: {total_published}")
 
-print("\nExample Run Complete!")
+# ---------------------------------------------------------
+# Scenario G: Passthrough queries
+# ---------------------------------------------------------
+print("\nScenario G: Passthrough queries")
+Article(title="Tutorial: Python ODM", author="John", status="published", word_count=1200, tags=["tutorial"]).put()
+Article(title="Advanced Queries", author="Alicia", status="published", word_count=800, tags=["advanced"]).put()
 
+# Note: Datastore filters use the Datastore alias name under the hood,
+# but for now we filter using the mapped names.
+results: list[Article] = list(Article.query().filter("author_name", "=", "Alice").fetch())
+print(f"Alice's articles: {len(results)} found")
+for r in results:
+    r: Article
+    print(f"  - {r.title} (status={r.status}, tags={r.tags})")
+
+
+# ---------------------------------------------------------
+# Scenario H: Query parameters
+# ---------------------------------------------------------
+
+# The classic Query.get() - Returns the first draft it finds or None
+print("\nGet on query to fetch first or none:")
+first_draft = Article.query().filter(Article.status == "draft").get()
+print(f"First draft: {first_draft}")
+non_existing_status = Article.query().filter(Article.status == "dummy").get()
+print(f"Wrong status: {non_existing_status}")
+
+# Projection & Distinct - Returns lightweight objects with ONLY the author populated
+unique_authors = list(Article.query().fetch(projection=[Article.author], distinct=True))
+print(f"\nUnique authors: {len(unique_authors)} found")
+for r in unique_authors:
+    r: Article
+    print(f"- {r}")
+    try:
+        print(r.title)
+    except AttributeError as e:
+        print(e)
+
+
+# Keys Only Fetching - Super fast, doesn't download document payloads
+all_keys = list(Article.query().fetch(keys_only=True))
+print("\nAll keys:")
+for r in all_keys:
+    print(r)
+
+print("\nExample Run Complete!")

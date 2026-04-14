@@ -167,16 +167,11 @@ class Property:
             Any: The fully validated value or list of validated values.
         """
         if value is None:
-            if self.required:
-                raise ValueError(f"Property '{self._python_name}' is required")
             return [] if self.repeated else None
 
         if self.repeated:
             if not isinstance(value, (list, tuple, set)):
                 raise TypeError(f"Property '{self._python_name}' is repeated and requires an iterable")
-
-            if self.required and len(value) == 0:
-                raise ValueError(f"Property '{self._python_name}' is required and cannot be empty")
 
             validated_list = []
             for item in value:
@@ -194,6 +189,14 @@ class Property:
         """
         if instance is None:
             return self
+
+        # noinspection PyProtectedMember
+        if instance._is_projected and self._python_name not in instance._values:
+            raise AttributeError(
+                f"Cannot access property '{self._python_name}' on '{owner.__name__}'. "
+                f"This entity was loaded via a Projection query and this field was not requested."
+            )
+
         # noinspection PyProtectedMember
         return instance._values.get(self._python_name, self.default)
 

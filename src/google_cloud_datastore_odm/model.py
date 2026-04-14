@@ -201,6 +201,8 @@ class Model(metaclass=ModelMeta):
         """
         self._values: Dict[str, Any] = {}
 
+        self._is_projected = kwargs.pop("_is_projected", False)
+
         _id = self._get_kwarg_or_alias(kwargs, "id")
         parent = self._get_kwarg_or_alias(kwargs, "parent")
         project = self._get_kwarg_or_alias(kwargs, "project")
@@ -229,7 +231,7 @@ class Model(metaclass=ModelMeta):
         for property_name, _property in self._properties.items():
             if property_name in kwargs:
                 setattr(self, property_name, kwargs.pop(property_name))
-            elif _property.default is not None:
+            elif not self._is_projected and _property.default is not None:
                 if callable(_property.default):
                     default_val = _property.default()
                 else:
@@ -238,8 +240,6 @@ class Model(metaclass=ModelMeta):
                     except TypeError:
                         default_val = _property.default
                 setattr(self, property_name, default_val)
-            elif _property.required:
-                raise ValueError(f"{property_name} is required")
 
         if kwargs:
             raise AttributeError(f"Unknown properties provided to {self.__class__.__name__}: {list(kwargs.keys())}")
@@ -546,7 +546,7 @@ class Model(metaclass=ModelMeta):
                 raise AttributeError(f"Unknown property: {key}")
 
     @classmethod
-    def from_entity(cls, entity: Optional[datastore.Entity]) -> Optional["Model"]:
+    def from_entity(cls, entity: Optional[datastore.Entity], _is_projected: bool = False) -> Optional["Model"]:
         """Create a model instance from a raw datastore Entity.
 
         Args:
@@ -558,7 +558,7 @@ class Model(metaclass=ModelMeta):
         if entity is None:
             return None
 
-        kwargs = {}
+        kwargs = {"_is_projected": _is_projected}
 
         for py_name, prop in cls._properties.items():
             if prop.datastore_name in entity:
@@ -566,8 +566,7 @@ class Model(metaclass=ModelMeta):
                 # noinspection PyProtectedMember
                 kwargs[py_name] = prop._from_base_type(raw_value)
 
-        instance = cls(key=entity.key, **kwargs)
-        return instance
+        return cls(key=entity.key, **kwargs)
 
     @classmethod
     def _pre_get_hook(cls, key: datastore.Key) -> None:
@@ -661,6 +660,19 @@ class Model(metaclass=ModelMeta):
 
         return Query(cls, project=resolved_proj, database=resolved_db, namespace=resolved_ns)
 
+    def _check_completeness(self):
+        """
+        Ensures no required fields are missing
+        """
+        for py_name, prop in self._properties.items():
+            if not prop.required:
+                continue
+
+            value = getattr(self, py_name)
+
+            if value in (None, []):
+                raise ValueError(f"Property '{py_name}' is required")
+
     def put(self, exclude_from_indexes: Optional[List[str]] = None) -> datastore.Key:
         """Persist the model instance to the Datastore.
 
@@ -675,6 +687,10 @@ class Model(metaclass=ModelMeta):
         Returns:
             datastore.Key: The fully resolved Datastore Key.
         """
+        if self._is_projected:
+            raise RuntimeError("Cannot save an entity fetched via a Projection query. This would cause data loss.")
+
+        self._check_completeness()
         self.validate()
         self._ensure_key()
         self._pre_put_hook()
@@ -781,6 +797,9 @@ class Model(metaclass=ModelMeta):
         if not instances:
             return []
 
+        if any(inst._is_projected for inst in instances):
+            raise RuntimeError("Cannot save an entity fetched via a Projection query. This would cause data loss.")
+
         for instance in instances:
             instance._ensure_key()
 
@@ -796,6 +815,7 @@ class Model(metaclass=ModelMeta):
         unindexed_names = tuple(cls._unindexed_datastore_names)
 
         for instance in instances:
+            instance._check_completeness()
             instance.validate()
             instance._pre_put_hook()
 

@@ -1,5 +1,5 @@
 import pytest
-from google.cloud.datastore import query
+from google.cloud.datastore import query, Key
 
 from src.google_cloud_datastore_odm import AND, OR, IntegerProperty, Model, StringProperty
 from src.google_cloud_datastore_odm.query import CompositeNode, FilterNode, Node, OrderNode, Query
@@ -249,3 +249,73 @@ def test_query_translate_unknown_node():
 
     with pytest.raises(TypeError, match="Unknown node type"):
         Query(model_cls=ASTUser)._translate(DummyNode())
+
+
+def test_query_keys_only(seed_data):
+    """Ensure keys_only=True returns Datastore Keys instead of Model instances."""
+    results = list(QueryTestModel.query().fetch(keys_only=True))
+
+    assert len(results) == 4
+    for result in results:
+        assert isinstance(result, Key)
+        assert result.kind == QueryTestModel.kind()
+
+
+def test_query_projection(seed_data):
+    """Ensure projection queries return partial models and block unrequested fields."""
+    results = list(QueryTestModel.query().fetch(projection=["name"]))
+
+    assert len(results) == 4
+    for result in results:
+        assert isinstance(result, QueryTestModel)
+        assert getattr(result, "_is_projected", False) is True
+        assert result.name in ["Alice", "Bob", "Charlie"]
+
+        with pytest.raises(AttributeError):
+            _ = result.age
+
+        with pytest.raises(RuntimeError):
+            result.age = 25
+            result.put()
+
+
+def test_query_distinct(seed_data):
+    """Ensure distinct=True filters out duplicate rows based on the projection."""
+    unique_authors = list(
+        QueryTestModel.query().fetch(projection=[QueryTestModel.name], distinct=True)
+    )
+
+    assert len(unique_authors) == 3
+    names = {r.name for r in unique_authors}
+    assert names == {"Alice", "Bob", "Charlie"}
+
+
+def test_query_get(seed_data):
+    """Ensure Query.get() returns the first match or None, and respects projections."""
+    alice = QueryTestModel.query().filter(QueryTestModel.name == "Alice").get()
+    assert isinstance(alice, QueryTestModel)
+    assert alice.name == "Alice"
+    assert alice.age in [25, 40]
+
+    nobody = QueryTestModel.query().filter(QueryTestModel.name == "Zebra").get()
+    assert nobody is None
+
+    projected_bob: QueryTestModel = QueryTestModel.query().filter(QueryTestModel.name == "Bob").get(
+        projection=[QueryTestModel.age]
+    )
+    assert getattr(projected_bob, "_is_projected", False) is True
+    assert projected_bob.age == 30
+
+    with pytest.raises(AttributeError):
+        _ = projected_bob.name
+
+
+def test_query_build_projection_mapping():
+    """Ensure _build correctly maps Property descriptors to Datastore names."""
+    q = ASTUser.query()
+
+    native_query = q._build(projection=[ASTUser.role, "name"])
+    assert native_query.projection == ["db_role", "name"]
+
+    native_distinct = q._build(projection=[ASTUser.role, "name"], distinct=True)
+    assert native_distinct.distinct_on == ["db_role", "name"]

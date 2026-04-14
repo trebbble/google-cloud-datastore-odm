@@ -223,10 +223,10 @@ def test_field_required_none_value():
     class RequiredModel(Model):
         text = StringProperty(required=True)
 
-    instance = RequiredModel(text="valid")
+    instance = RequiredModel()
 
     with pytest.raises(ValueError):
-        instance.text = None
+        instance.put()
 
 
 def test_field_optional_none_value():
@@ -263,8 +263,11 @@ def test_repeated_property():
         tags = StringProperty(repeated=True)
         req_tags = StringProperty(repeated=True, required=True)
 
-    instance = RepeatedModel(req_tags=["init"])
+    instance = RepeatedModel()
     assert instance.tags == []
+
+    with pytest.raises(ValueError):
+        instance.put()
 
     instance.tags = ["python", "odm"]
     assert instance.tags == ["python", "odm"]
@@ -274,9 +277,6 @@ def test_repeated_property():
 
     with pytest.raises(TypeError):
         instance.tags = ["valid", 123]
-
-    with pytest.raises(ValueError):
-        instance.req_tags = []
 
     with pytest.raises(ValueError):
         instance.tags = ["valid", None]
@@ -335,6 +335,16 @@ def test_model_from_entity_with_none():
 
     instance = DummyModel.from_entity(None)
     assert instance is None
+
+
+def test_default_non_accessible_if_projection():
+    class DummyModel(Model):
+        text = StringProperty(default="hello there")
+
+    instance = DummyModel(_is_projected=True)
+
+    with pytest.raises(AttributeError):
+        _ = instance.text
 
 
 def test_datetime_auto_now_add():

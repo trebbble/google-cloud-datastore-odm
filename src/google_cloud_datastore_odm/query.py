@@ -109,7 +109,12 @@ class Query:
 
         raise TypeError(f"Unknown node type: {type(node)}")
 
-    def _build(self) -> query.Query:
+    def _build(
+            self,
+            projection: Optional[List[Union[str, "Property"]]] = None,
+            distinct: bool = False,
+            keys_only: bool = False
+    ) -> query.Query:
         """Helper to prepare the native SDK Query object."""
         client = get_client(self.project, self.database)
         _query = client.query(kind=self.model_cls.kind(), namespace=self.namespace)
@@ -120,12 +125,47 @@ class Query:
         if self._orders:
             _query.order = [f"{'-' if o.descending else ''}{o.name}" for o in self._orders]
 
+        if projection:
+            from .properties import Property
+            mapped_proj = [p.datastore_name if isinstance(p, Property) else p for p in projection]
+            _query.projection = mapped_proj
+
+            if distinct:
+                _query.distinct_on = mapped_proj
+
+        if keys_only:
+            _query.keys_only()
+
         return _query
 
-    def fetch(self, limit: Optional[int] = None) -> Generator["Model", None, None]:
-        """Yields hydrated Model instances from the Datastore."""
-        for entity in self._build().fetch(limit=limit):
-            yield self.model_cls.from_entity(entity)
+    def fetch(
+            self,
+            limit: Optional[int] = None,
+            projection: Optional[List[Union[str, "Property"]]] = None,
+            distinct: bool = False,
+            keys_only: bool = False
+    ) -> Generator[Union["Model", Any], None, None]:
+        """Yields hydrated Model instances (or Keys) from the Datastore."""
+        native_query = self._build(projection=projection, distinct=distinct, keys_only=keys_only)
+
+        is_projected = bool(projection)
+
+        for entity in native_query.fetch(limit=limit):
+            if keys_only:
+                yield entity.key
+            else:
+                yield self.model_cls.from_entity(entity, _is_projected=is_projected)
+
+    def get(
+            self,
+            projection: Optional[List[Union[str, "Property"]]] = None
+    ) -> Optional["Model"]:
+        """
+        Executes the query and returns the first matching Model instance,
+        or None if no results are found.
+        """
+        results = list(self.fetch(limit=1, projection=projection))
+        return results[0] if results else None
 
     def count(self) -> int:
         """Performs a server-side count aggregation (very fast)."""
