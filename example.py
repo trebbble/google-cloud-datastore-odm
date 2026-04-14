@@ -14,7 +14,9 @@ from dotenv import load_dotenv
 from src.google_cloud_datastore_odm import (
     AND,
     OR,
+    Avg,
     BooleanProperty,
+    Count,
     DateProperty,
     DateTimeProperty,
     FloatProperty,
@@ -22,6 +24,7 @@ from src.google_cloud_datastore_odm import (
     JsonProperty,
     Model,
     StringProperty,
+    Sum,
     TextProperty,
     TimeProperty,
     and_,
@@ -577,11 +580,27 @@ for art in q_e2.fetch():
 # ---------------------------------------------------------
 # Server-Side Aggregation (Count)
 # ---------------------------------------------------------
-print("\nScenario F: Server-Side Count Aggregation")
-print("  [Log] Executing CountAggregation (No payload download):")
-total_published = Article.query().filter(Article.status == "published").count()
-print(f"    -> Total published articles: {total_published}")
+print("\nServer-Side Aggregations")
+base_query = Article.query().filter(Article.status == "published")
 
+total_published = base_query.count()
+total_words = base_query.sum(Article.word_count)
+average_words = base_query.avg(Article.word_count)
+
+print(f"Total published articles: {total_published}")
+print(f"Total Words Written: {total_words}")
+print(f"Average Words per Article: {average_words:.1f}")
+
+print("\n--- Batch Aggregations ---")
+stats = base_query.aggregate(
+    total_articles=Count(),
+    total_words=Sum(Article.word_count),
+    average_words=Avg('word_count')
+)
+
+print(f"Total Published Articles: {stats['total_articles']}")
+print(f"Total Words Written: {stats['total_words']}")
+print(f"Average Words per Article: {stats['average_words']:.1f}")
 # ---------------------------------------------------------
 # Passthrough queries
 # ---------------------------------------------------------

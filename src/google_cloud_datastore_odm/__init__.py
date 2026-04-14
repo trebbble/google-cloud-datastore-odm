@@ -13,6 +13,7 @@ from .properties import TextProperty as TextProperty
 from .properties import TimeProperty as TimeProperty
 from .query import AND as AND
 from .query import OR as OR
+from .query import Avg, Count, Sum
 from .query import and_ as and_
 from .query import or_ as or_
 
@@ -33,5 +34,8 @@ __all__ = [
     "and_",
     "AND",
     "or_",
-    "OR"
+    "OR",
+    "Count",
+    "Sum",
+    "Avg"
 ]

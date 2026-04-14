@@ -28,11 +28,6 @@ services:
       - datastore-dev
     environment:
       DATASTORE_EMULATOR_URL: datastore-dev:8081
-      # fill the rest with dummies as runtime needs them
-      STORAGE_EMULATOR_URL: host.docker.internal
-      PUBSUB_EMULATOR_URL: host.docker.internal
-      FIRESTORE_EMULATOR_URL: host.docker.internal
-      DATASTORE_FILE_SERVER_URL: host.docker.internal
 
 volumes:
   datastore-dev:

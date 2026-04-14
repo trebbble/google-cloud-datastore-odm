@@ -7,10 +7,12 @@ This module is structured into three layers:
 3. Query Engine: The main class that translates Nodes into Datastore SDK calls.
 """
 
-from typing import TYPE_CHECKING, Any, Generator, List, Optional, Union
+from typing import TYPE_CHECKING, Any, Dict, Generator, List, Optional, Union
 
 from google.cloud.datastore import query
-from google.cloud.datastore.aggregation import CountAggregation
+from google.cloud.datastore.aggregation import AvgAggregation as Avg
+from google.cloud.datastore.aggregation import CountAggregation as Count
+from google.cloud.datastore.aggregation import SumAggregation as Sum
 
 from .client import get_client
 
@@ -219,7 +221,78 @@ class Query:
         """Performs a server-side count aggregation (very fast)."""
         client = get_client(self.project, self.database)
         agg_query = client.aggregation_query(self._build())
-        agg_query.add_aggregation(CountAggregation())
+        agg_query.add_aggregation(Count())
 
         results = list(agg_query.fetch())
         return results[0][0].value if results else 0
+
+    def sum(self, property_field: Union[str, "Property"]) -> Union[int, float]:
+        """Performs a fast server-side sum aggregation on a specific property."""
+        from .properties import Property
+        prop_name = property_field.datastore_name if isinstance(property_field, Property) else property_field
+
+        client = get_client(self.project, self.database)
+        agg_query = client.aggregation_query(self._build())
+        agg_query.add_aggregation(Sum(prop_name))
+
+        results = list(agg_query.fetch())
+        return results[0][0].value if results and results[0] else 0
+
+    def avg(self, property_field: Union[str, "Property"]) -> float:
+        """Performs a fast server-side average aggregation on a specific property."""
+        from .properties import Property
+        prop_name = property_field.datastore_name if isinstance(property_field, Property) else property_field
+
+        client = get_client(self.project, self.database)
+        agg_query = client.aggregation_query(self._build())
+        agg_query.add_aggregation(Avg(prop_name))
+
+        results = list(agg_query.fetch())
+
+        return results[0][0].value if results and results[0] else None
+
+    def aggregate(self, **kwargs: Union[Count, Sum, Avg]) -> Dict[str, Any]:
+        """
+        Performs multiple aggregations in a single Datastore RPC call.
+
+        Args:
+            **kwargs: Alias names mapped to Aggregation objects (Count, Sum, or Avg).
+
+        Returns:
+            Dict[str, Any]: A dictionary mapping your aliases to their aggregated values.
+        """
+        client = get_client(self.project, self.database)
+        agg_query = client.aggregation_query(self._build())
+
+        for alias, agg_obj in kwargs.items():
+            if not isinstance(agg_obj, (Count, Sum, Avg)):
+                raise TypeError(
+                    f"Aggregation '{alias}' must be a Count, Sum, or Avg object. "
+                    f"Got {type(agg_obj).__name__} instead."
+                )
+
+            if isinstance(agg_obj, (Sum, Avg)):
+                from .properties import Property
+                if isinstance(agg_obj.property_ref, Property):
+                    agg_obj.property_ref = agg_obj.property_ref.datastore_name
+
+            agg_obj.alias = alias
+            agg_query.add_aggregation(agg_obj)
+
+        results = list(agg_query.fetch())
+
+        if not results or not results[0]:
+            return {
+                alias: None
+                for alias in kwargs
+            }
+
+        result_map = {
+            res.alias: res.value
+            for res in results[0]
+        }
+
+        return {
+            alias: result_map.get(alias)
+            for alias in kwargs
+        }

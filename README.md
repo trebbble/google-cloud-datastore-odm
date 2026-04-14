@@ -93,18 +93,18 @@ https://trebbble.github.io/google-cloud-datastore-odm/
   - [x] Logical and/or
   - [x] Native IN/NOT_IN
 - [x] Limits
-- [ ] Pagination / Cursors
+- [x] Pagination with cursors
 - [x] Ordered queries
 - [x] Keys-only queries
 - [x] Projection queries
 - [x] Distinct queries
 - [x] .get() queries for first or None
 - [ ] Transaction-bound queries
-- [ ] Aggregations
+- [x] Aggregations
   - [x] Count
-  - [ ] Sum
-  - [ ] Avg
-
+  - [x] Sum
+  - [x] Avg
+  - [x] Batch aggregate
 - [ ] Warnings for queries on unindexed properties (for normal filters or even projections)
 
 ### Persistence & Operations

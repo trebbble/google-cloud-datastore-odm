@@ -161,7 +161,7 @@ print(f"Saved with ID: {article.key.id_or_name}")
 The ODM provides familiar NDB-style methods for retrieving data.
 
 ```python
-from src.google_cloud_datastore_odm import Model, StringProperty, IntegerProperty, OR, or_, AND, and_
+from src.google_cloud_datastore_odm import Model, StringProperty, IntegerProperty, OR, or_, AND, and_, Count, Sum, Avg
 
 class Article(Model):
     title = StringProperty(required=True)
@@ -214,9 +214,6 @@ IN_query = Article.query().filter(Article.tags.IN(["python", "gcp"]))
 # Sorting / Ordering (Use the unary minus for descending order)
 ordered_query = Article.query().filter(Article.status == "published").order(-Article.rating, Article.title)
 
-# Fast Server-Side Count Aggregation (Does not download entities)
-total_published = Article.query().filter(Article.status == "published").count()
-
 # The NDB-style .get() method (Returns the first matching entity or None)
 first_draft = Article.query().filter(Article.status == "draft").get()
 
@@ -257,6 +254,25 @@ while has_more:
 
     for article in page:
         print(f"{article.author} - {article.title}")
+
+# Fast Server-Side Aggregations
+base_query = Article.query().filter(Article.status == "published")
+
+total_published = base_query.count()
+total_words = base_query.sum(Article.word_count)
+average_words = base_query.avg(Article.word_count)
+
+print(f"Total published articles: {total_published}")
+print(f"Total Words Written: {total_words}")
+print(f"Average Words per Article: {average_words:.1f}")
+
+print("\n--- Batch Aggregations ---")
+stats = base_query.aggregate(
+    total_articles=Count(),
+    total_words=Sum(Article.word_count),
+    average_words=Avg('word_count')
+)
+
 ```
 
 ## 6. Strict Equality

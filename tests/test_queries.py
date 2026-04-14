@@ -2,9 +2,10 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from google.cloud.datastore import Key, query
+from google.cloud.datastore.aggregation import AggregationQuery
 
 from src.google_cloud_datastore_odm import AND, OR, IntegerProperty, Model, StringProperty
-from src.google_cloud_datastore_odm.query import CompositeNode, FilterNode, Node, OrderNode, Query
+from src.google_cloud_datastore_odm.query import Avg, CompositeNode, Count, FilterNode, Node, OrderNode, Query, Sum
 from tests.conftest import QueryTestModel
 
 
@@ -377,3 +378,82 @@ def test_query_fetch_page_stop_iteration():
     assert page == []
     assert cursor is None
     assert has_more is False
+
+
+def test_query_sum_aggregation(seed_data):
+    """Ensure sum() computes the server-side sum of a property."""
+    total_age = QueryTestModel.query().sum(QueryTestModel.age)
+    assert total_age == 130
+
+    total_age_str = QueryTestModel.query().sum("age")
+    assert total_age_str == 130
+
+    alice_age = QueryTestModel.query().filter(QueryTestModel.name == "Alice").sum(QueryTestModel.age)
+    assert alice_age == 65
+
+
+def test_query_avg_aggregation(seed_data):
+    """Ensure avg() computes the server-side average of a property."""
+    average_age = QueryTestModel.query().avg(QueryTestModel.age)
+    assert average_age == 32.5
+
+    alice_avg = QueryTestModel.query().filter(QueryTestModel.name == "Alice").avg(QueryTestModel.age)
+    assert alice_avg == 32.5
+
+    empty_avg = QueryTestModel.query().filter(QueryTestModel.name == "Nobody").avg(QueryTestModel.age)
+    assert empty_avg in (None, 0.0)
+
+
+def test_query_aggregate_batch(seed_data):
+    """Ensure aggregate() performs multiple calculations in a single call."""
+    stats = QueryTestModel.query().aggregate(
+        total_people=Count(),
+        total_age=Sum(QueryTestModel.age),
+        average_age=Avg(QueryTestModel.age)
+    )
+
+    assert stats["total_people"] == 4
+    assert stats["total_age"] == 130
+    assert stats["average_age"] == 32.5
+
+
+def test_query_aggregate_filtered(seed_data):
+    """Ensure aggregate() respects query filters."""
+    stats = QueryTestModel.query().filter(QueryTestModel.name == "Alice").aggregate(
+        total=Count(),
+        sum_age=Sum(QueryTestModel.age)
+    )
+
+    assert stats["total"] == 2
+    assert stats["sum_age"] == 65
+
+
+def test_query_aggregate_empty_dataset(seed_data):
+    """Ensure aggregate() gracefully handles queries that match zero entities."""
+    stats = QueryTestModel.query().filter(QueryTestModel.name == "NonExistent").aggregate(
+        total=Count(),
+        average_age=Avg(QueryTestModel.age)
+    )
+
+    assert stats["total"] == 0
+    assert stats["average_age"] in (None, 0.0)
+
+
+def test_query_aggregate_type_safety():
+    """Ensure aggregate() loudly rejects invalid aggregation objects."""
+    q = QueryTestModel.query()
+
+    with pytest.raises(TypeError):
+        q.aggregate(invalid_alias="Article.word_count")
+
+    q.aggregate(c=Count())
+
+
+def test_query_aggregate_no_results_mock():
+    """Ensure aggregate() safely handles a catastrophic SDK failure returning empty lists."""
+    q = QueryTestModel.query()
+
+    with patch.object(AggregationQuery, 'fetch', return_value=[]):
+        stats = q.aggregate(total=Count())
+
+        assert stats == {"total": None}
