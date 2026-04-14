@@ -112,7 +112,7 @@ class Query:
     def _build(
             self,
             projection: Optional[List[Union[str, "Property"]]] = None,
-            distinct: bool = False,
+            distinct_on: Optional[List[Union[str, "Property"]]] = None,
             keys_only: bool = False
     ) -> query.Query:
         """Helper to prepare the native SDK Query object."""
@@ -130,8 +130,10 @@ class Query:
             mapped_proj = [p.datastore_name if isinstance(p, Property) else p for p in projection]
             _query.projection = mapped_proj
 
-            if distinct:
-                _query.distinct_on = mapped_proj
+        if distinct_on:
+            from .properties import Property
+            mapped_distinct = [d.datastore_name if isinstance(d, Property) else d for d in distinct_on]
+            _query.distinct_on = mapped_distinct
 
         if keys_only:
             _query.keys_only()
@@ -142,11 +144,15 @@ class Query:
             self,
             limit: Optional[int] = None,
             projection: Optional[List[Union[str, "Property"]]] = None,
-            distinct: bool = False,
+            distinct_on: Optional[List[Union[str, "Property"]]] = None,
             keys_only: bool = False
     ) -> Generator[Union["Model", Any], None, None]:
         """Yields hydrated Model instances (or Keys) from the Datastore."""
-        native_query = self._build(projection=projection, distinct=distinct, keys_only=keys_only)
+        native_query = self._build(
+            projection=projection,
+            distinct_on=distinct_on,
+            keys_only=keys_only
+        )
 
         is_projected = bool(projection)
 
@@ -158,13 +164,14 @@ class Query:
 
     def get(
             self,
-            projection: Optional[List[Union[str, "Property"]]] = None
+            projection: Optional[List[Union[str, "Property"]]] = None,
+            distinct_on: Optional[List[Union[str, "Property"]]] = None
     ) -> Optional["Model"]:
         """
         Executes the query and returns the first matching Model instance,
         or None if no results are found.
         """
-        results = list(self.fetch(limit=1, projection=projection))
+        results = list(self.fetch(limit=1, projection=projection, distinct_on=distinct_on))
         return results[0] if results else None
 
     def count(self) -> int:

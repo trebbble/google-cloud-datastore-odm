@@ -228,13 +228,19 @@ all_article_keys = list(Article.query().fetch(keys_only=True))
 
 # Projection Queries (Download only specific fields to save memory/bandwidth)
 # accepts Properties or raw datastore fields as strings
-# Note: Accessing unprojected fields (like 'word_count') on these objects will safely raise an AttributeError.
+# Note: Accessing unprojected fields (like 'title' or 'tags') on these objects will safely raise an AttributeError.
 # Attempting to .put() a projected entity will raise a RuntimeError to prevent data loss.
 lightweight_articles = list(Article.query().fetch(projection=[Article.author, Article.status, 'word_count']))
 
-# Distinct Queries (Get unique categories - MUST be used with projection)
-# accepts Properties or raw datastore fields as strings
-unique_authors = list(Article.query().fetch(projection=[Article.author, 'status'], distinct=True))
+# Distinct Queries (Get the first full document for each unique category)
+# Accepts Python Property descriptors or raw Datastore field names as strings.
+first_articles_by_author = list(Article.query().fetch(distinct_on=[Article.author]))
+
+# Distinct + Projection (Get lightweight combinations of unique categories)
+unique_author_statuses = list(Article.query().fetch(
+    projection=[Article.author, Article.status], 
+    distinct_on=[Article.author, Article.status]
+))
 ```
 
 ## 6. Strict Equality

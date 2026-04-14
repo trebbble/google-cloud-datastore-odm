@@ -280,9 +280,9 @@ def test_query_projection(seed_data):
 
 
 def test_query_distinct(seed_data):
-    """Ensure distinct=True filters out duplicate rows based on the projection."""
+    """Ensure distinct_on filters out duplicate rows based on the projection."""
     unique_authors = list(
-        QueryTestModel.query().fetch(projection=[QueryTestModel.name], distinct=True)
+        QueryTestModel.query().fetch(projection=[QueryTestModel.name], distinct_on=[QueryTestModel.name])
     )
 
     assert len(unique_authors) == 3
@@ -317,5 +317,5 @@ def test_query_build_projection_mapping():
     native_query = q._build(projection=[ASTUser.role, "name"])
     assert native_query.projection == ["db_role", "name"]
 
-    native_distinct = q._build(projection=[ASTUser.role, "name"], distinct=True)
+    native_distinct = q._build(projection=[ASTUser.role, "name"], distinct_on=["db_role", ASTUser.name])
     assert native_distinct.distinct_on == ["db_role", "name"]

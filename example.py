@@ -609,22 +609,35 @@ print(f"First draft: {first_draft}")
 non_existing_status = Article.query().filter(Article.status == "dummy").get()
 print(f"Wrong status: {non_existing_status}")
 
-# Projection & Distinct - Returns lightweight objects with ONLY the author populated
-unique_authors = list(Article.query().fetch(projection=[Article.author], distinct=True))
+# Distinct
+unique_authors = list(Article.query().fetch(distinct_on=[Article.author]))
 print(f"\nUnique authors: {len(unique_authors)} found")
 for r in unique_authors:
     r: Article
-    print(f"- {r}")
-    try:
-        print(r.title)
-    except AttributeError as e:
-        print(e)
+    print(f"- {r.author}")
 
+# Projection
+just_authors = list(Article.query().fetch(projection=[Article.author]))
+print(f"\nAll authors: {len(unique_authors)} found")
+for r in just_authors:
+    r: Article
+    print(f"- {r}")
+
+try:
+    print(unique_authors[0].title)
+except AttributeError as e:
+    print(e)
+
+# Projection & Distinct
+unique_authors = list(Article.query().fetch(projection=[Article.author, 'title'], distinct_on=[Article.author]))
+print(f"\nUnique authors with titles: {len(unique_authors)} found")
+for r in unique_authors:
+    r: Article
+    print(f"- {r}")
 
 # Keys Only Fetching - Super fast, doesn't download document payloads
 all_keys = list(Article.query().fetch(keys_only=True))
-print("\nAll keys:")
-for r in all_keys:
-    print(r)
+print(f"\nFound {len(all_keys)} keys")
+
 
 print("\nExample Run Complete!")
