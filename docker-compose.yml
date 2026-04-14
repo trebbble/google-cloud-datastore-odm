@@ -9,7 +9,6 @@ services:
     command: >
       gcloud emulators firestore start
       --database-mode=datastore-mode
-      --project=google-cloud-datastore-odm-dev
       --host-port=0.0.0.0:8081
 
   datastore-test:
@@ -19,7 +18,6 @@ services:
     command: >
       gcloud emulators firestore start
       --database-mode=datastore-mode
-      --project=google-cloud-datastore-odm-test
       --host-port=0.0.0.0:8081
 
   emulators-ui:

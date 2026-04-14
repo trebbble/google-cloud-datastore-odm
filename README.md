@@ -86,15 +86,24 @@ https://trebbble.github.io/google-cloud-datastore-odm/
   - [ ] Atomic get_or_insert
 
 ### Query API
-- [x] Pass through queries
-- [ ] ODM style filtering
-- [ ] Limits
+- [x] Pass through queries with raw datastore fields and operators
+- [x] ODM style filtering
+  - [x] AST and chained filters
+  - [x] Equality/Unequality
+  - [x] Logical and/or
+  - [x] Native IN/NOT_IN
+- [x] Limits
 - [ ] Pagination / Cursors
+- [x] Ordered queries
 - [ ] Keys-only queries
 - [ ] Projection queries
-- [ ] Chained query filters
+- [ ] Distinct queries
 - [ ] Transaction-bound queries
-- [ ] Aggregate queries
+- [ ] Aggregations
+  - [x] Count
+  - [ ] Sum
+  - [ ] Avg
+
 - [ ] Warnings for potentially unindexed queries
 
 ### Persistence & Operations

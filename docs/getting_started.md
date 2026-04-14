@@ -161,10 +161,11 @@ print(f"Saved with ID: {article.key.id_or_name}")
 The ODM provides familiar NDB-style methods for retrieving data.
 
 ```python
-from src.google_cloud_datastore_odm import Model, StringProperty, IntegerProperty
+from src.google_cloud_datastore_odm import Model, StringProperty, IntegerProperty, OR, or_, AND, and_
 
 class Article(Model):
     title = StringProperty(required=True)
+    # The ODM automatically handles mapping this to 'author_name' in Datastore
     author = StringProperty(required=True, name="author_name")
     status = StringProperty(default="draft", choices=["draft", "published", "archived"])
     rating = IntegerProperty(choices=[1, 2, 3, 4, 5])
@@ -182,16 +183,39 @@ article = Article(
 
 saved_key = article.put()
 
-# Fetch by Key
-fetched = Article.get(key=saved_key)
+# --- Fetching by Key or ID ---
 
-# Fetch by explicit ID
+fetched = Article.get(key=saved_key)
 fetched_by_id = Article.get_by_id("my-first-article")
 
-# Query filtering
-# Note: Currently, filters must use the underlying Datastore alias name
+# Query filtering with raw datastore fields and operators as strings
 query = Article.query().filter("author_name", "=", "Alice")
-results = list(query.fetch(limit=2))
+alice_articles = list(query.fetch(limit=2))
+
+# --- ODM-Style Querying ---
+
+# Basic Equality (Automatically maps to the 'author_name' Datastore column!)
+query = Article.query().filter(Article.author == "Alice")
+alice_arts = list(query.fetch(limit=10))
+
+# Implicit AND (Multiple filters) & Inequality
+implicit_and_query = Article.query().filter(Article.author == "Alice", Article.word_count > 100)
+
+# Composite OR Logic
+or_query = Article.query().filter(
+    OR(Article.status == "draft", Article.rating == 5)
+)
+
+# The IN Operator (Acts as 'array-contains-any' for repeated properties)
+# Supports both PEP 8 compliant lowercase and NDB legacy uppercase
+in_query = Article.query().filter(Article.tags.in_(["python", "gcp"]))
+IN_query = Article.query().filter(Article.tags.IN(["python", "gcp"]))
+
+# Sorting / Ordering (Use the unary minus for descending order)
+ordered_query = Article.query().filter(Article.status == "published").order(-Article.rating, Article.title)
+
+# Fast Server-Side Count Aggregation (Does not download entities)
+total_published = Article.query().filter(Article.status == "published").count()
 ```
 
 ## 6. Strict Equality
