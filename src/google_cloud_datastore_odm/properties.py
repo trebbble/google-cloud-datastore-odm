@@ -233,6 +233,70 @@ class Property:
         """
         pass
 
+    def _comparison(self, op: str, value: Any) -> Any:
+        """Internal helper to generate a FilterNode for queries."""
+        from .query import FilterNode
+
+        if value is not None:
+            value = self._to_base_type(value)
+
+        return FilterNode(self.datastore_name, op, value)
+
+    def __eq__(self, value: Any):
+        return self._comparison("=", value)
+
+    def __ne__(self, value: Any):
+        return self._comparison("!=", value)
+
+    def __lt__(self, value: Any):
+        return self._comparison("<", value)
+
+    def __le__(self, value: Any):
+        return self._comparison("<=", value)
+
+    def __gt__(self, value: Any):
+        return self._comparison(">", value)
+
+    def __ge__(self, value: Any):
+        return self._comparison(">=", value)
+
+    def in_(self, values: list):
+        """Generates an 'IN' query filter."""
+        from .query import FilterNode
+
+        if not isinstance(values, (list, tuple, set)):
+            raise TypeError("IN operator requires an iterable (list, tuple, set)")
+
+        base_values = [self._to_base_type(v) for v in values]
+
+        return FilterNode(self.datastore_name, "IN", base_values)
+
+    def not_in_(self, values: list):
+        """Generates a 'NOT IN' query filter."""
+        from .query import FilterNode
+
+        if not isinstance(values, (list, tuple, set)):
+            raise TypeError("NOT_IN operator requires an iterable (list, tuple, set)")
+
+        base_values = [self._to_base_type(v) for v in values]
+
+        return FilterNode(self.datastore_name, "NOT_IN", base_values)
+
+    def __neg__(self):
+        """Allows descending order queries using the unary minus: -Article.age"""
+        from .query import OrderNode
+
+        return OrderNode(self.datastore_name, descending=True)
+
+    def __pos__(self):
+        """Allows explicit ascending order queries: +Article.age"""
+        from .query import OrderNode
+
+        return OrderNode(self.datastore_name, descending=False)
+
+    IN = in_
+    NOT_IN = not_in_
+
 
 class StringProperty(Property):
     """A Datastore property that strictly enforces string values."""

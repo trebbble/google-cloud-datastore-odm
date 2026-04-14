@@ -12,6 +12,8 @@ import json
 from dotenv import load_dotenv
 
 from src.google_cloud_datastore_odm import (
+    AND,
+    OR,
     BooleanProperty,
     DateProperty,
     DateTimeProperty,
@@ -22,8 +24,11 @@ from src.google_cloud_datastore_odm import (
     StringProperty,
     TextProperty,
     TimeProperty,
+    and_,
+    field_validator,
+    model_validator,
+    or_,
 )
-from src.google_cloud_datastore_odm.model import field_validator, model_validator
 
 load_dotenv()
 
@@ -166,7 +171,7 @@ print("\n--- Instance Creation ---")
 article = Article(
     id="my-first-article",
     title="Hello, World!",
-    author="Alice",
+    author="Alicia",
     word_count=500,
     is_featured=True,
     score=98.5,
@@ -258,13 +263,13 @@ print(f"Are they equal after modifying one's title? {fetched_by_id == article}")
 # ---------------------------------------------------------------------------
 
 print("\n--- Queries ---")
-Article(title="Tutorial: Python ODM", author="Bob", status="published", word_count=1200, tags=["tutorial"]).put()
-Article(title="Advanced Queries", author="Alice", status="published", word_count=800, tags=["advanced"]).put()
+Article(title="Tutorial: Python ODM", author="John", status="published", word_count=1200, tags=["tutorial"]).put()
+Article(title="Advanced Queries", author="Alicia", status="published", word_count=800, tags=["advanced"]).put()
 
 # Note: Datastore filters use the Datastore alias name under the hood,
 # but for now we filter using the mapped names.
-results: list[Article] = list(Article.query().filter("author_name", "=", "Alice").fetch())
-print(f"Alice's articles: {len(results)} found")
+results: list[Article] = list(Article.query().filter("author_name", "=", "Alicia").fetch())
+print(f"Alicia's articles: {len(results)} found")
 for r in results:
     # Adding an explicit type hint to satisfy PyCharm's static analyzer
     r: Article
@@ -290,7 +295,7 @@ batch_keys = Article.put_multi(batch_articles)
 print(f"Saved {len(batch_keys)} articles using put_multi.")
 
 # get_multi retrieves instances in the exact order requested
-fetched_batch = Article.get_multi(batch_keys)
+fetched_batch: list[Article] = Article.get_multi(batch_keys)
 print(f"Fetched {len(fetched_batch)} articles using get_multi.")
 print(f"First fetched from batch: {fetched_batch[0].title}")
 
@@ -441,7 +446,7 @@ print(log_default)
 
 log_tenant = SystemLog(
     event="Login",
-    user_id="alice",
+    user_id="alicia",
     project="customer-project-123",
     database="db-2",
     namespace="tenant-b"
@@ -460,9 +465,144 @@ print(f"Found {len(central_logs)} startup logs in the central project.")
 
 customer_logs = list(
     SystemLog.query(project="customer-project-123", database='db-2', namespace="tenant-b")
-    .filter("user_id", "=", "alice")
+    .filter("user_id", "=", "alicia")
     .fetch()
 )
-print(f"Found {len(customer_logs)} logs for Alice in customer-project-123.")
+print(f"Found {len(customer_logs)} logs for Alicia in customer-project-123.")
 
-print("\nDone!")
+
+# ---------------------------------------------------------------------------
+# 19. Advanced NDB-Style Queries & Aggregations
+# ---------------------------------------------------------------------------
+
+print("\n--- 19. Advanced NDB-Style Queries ---")
+
+# Seed specific data for testing our advanced operators
+print("Seeding data for advanced queries...")
+adv_articles = [
+    Article(id="adv1", title="Python 101", author="Alice", status="published", word_count=500,
+            tags=["python", "beginner"], score=4.9),
+    Article(id="adv2", title="GCP Masterclass", author="Bob", status="published", word_count=3500,
+            tags=["gcp", "advanced"], score=4.9),
+    Article(id="adv3", title="Draft Notes", author="Alice", status="draft", word_count=150,
+            tags=["notes"], score=0.0),
+    Article(id="adv4", title="Datastore Deep Dive", author="Charlie", status="published", word_count=5000,
+            tags=["gcp", "datastore"], score=5.0),
+    Article(id="adv5", title="Old Archived Post", author="Bob", status="archived", word_count=1200,
+            tags=["legacy"], score=3.2),
+]
+Article.put_multi(adv_articles)
+
+# ---------------------------------------------------------
+# Scenario A: Explicit and Implicit AND Logic
+# ---------------------------------------------------------
+print("\nScenario A: Explicit and Implicit AND logic")
+
+print("  [Log] Using implicit AND (multiple arguments in .filter()):")
+q_a1 = Article.query().filter(Article.author == "Alice", Article.status == "published")
+for art in q_a1.fetch():
+    art: Article
+    print(f"    -> {art.title} (Author: {art.author}, Status: {art.status})")
+
+print("  [Log] Using uppercase AND() alias (NDB Legacy):")
+q_a2 = Article.query().filter(AND(Article.author == "Bob", Article.score >= 4.0))
+for art in q_a2.fetch():
+    art: Article
+    print(f"    -> {art.title} (Author: {art.author}, Score: {art.score})")
+
+print("  [Log] Using lowercase and_() method (PEP 8 Compliant):")
+q_a3 = Article.query().filter(and_(Article.author == "Charlie", Article.word_count > 1000))
+for art in q_a3.fetch():
+    art: Article
+    print(f"    -> {art.title} (Author: {art.author}, Words: {art.word_count})")
+
+
+# ---------------------------------------------------------
+# Scenario B: Composite OR logic variations
+# ---------------------------------------------------------
+print("\nScenario B: Composite OR Queries")
+
+print("  [Log] Using uppercase OR() alias (NDB Legacy):")
+q_b1 = Article.query().filter(OR(Article.author == "Charlie", Article.score >= 4.5))
+for art in q_b1.fetch():
+    print(f"    -> {art.title} (Author: {art.author}, Score: {art.score})")
+
+print("  [Log] Using lowercase or_() method (PEP 8 Compliant):")
+q_b2 = Article.query().filter(or_(Article.status == "draft", Article.status == "archived"))
+for art in q_b2.fetch():
+    print(f"    -> {art.title} (Status: {art.status})")
+
+print("\n  [Log] Testing OR with a repeated property (array-membership inside OR):")
+# This is the query that crashed the old emulator!
+q_b3 = Article.query().filter(OR(Article.author == "Charlie", Article.tags == "beginner"))
+for art in q_b3.fetch():
+    print(f"    -> {art.title} (Author: {art.author}, Tags: {art.tags})")
+
+# ---------------------------------------------------------
+# Scenario C: IN and NOT IN operators (Native)
+# ---------------------------------------------------------
+print("\nScenario C: IN and NOT IN operators")
+
+print("  [Log] Using lowercase .in_() method (PEP 8 Compliant):")
+q_c1 = Article.query().filter(Article.status.in_(["draft", "archived"]))
+for art in q_c1.fetch():
+    print(f"    -> {art.title} (Status: {art.status})")
+
+print("  [Log] Using uppercase .IN() alias (NDB Legacy):")
+q_c2 = Article.query().filter(Article.author.IN(["Alice", "Charlie"]))
+for art in q_c2.fetch():
+    print(f"    -> {art.title} (Author: {art.author})")
+
+print("  [Log] Using lowercase .not_in_() method (PEP 8 Compliant):")
+q_c3 = Article.query().filter(Article.status.not_in_(["published"]))
+for art in q_c3.fetch():
+    print(f"    -> {art.title} (Status: {art.status})")
+
+print("  [Log] Using uppercase .NOT_IN() alias (NDB Legacy):")
+q_c4 = Article.query().filter(Article.author.NOT_IN(["Alice", "Bob"]))
+for art in q_c4.fetch():
+    print(f"    -> {art.title} (Author: {art.author})")
+
+print("\n  [Log] Testing .in_() on a repeated property (array-contains-any):")
+q_c5 = Article.query().filter(Article.tags.in_(["notes", "datastore"]))
+for art in q_c5.fetch():
+    print(f"    -> {art.title} (Tags: {art.tags})")
+
+# ---------------------------------------------------------
+# Scenario D: Bitwise logical operators (& and |)
+# ---------------------------------------------------------
+print("\nScenario D: Bitwise Logical Operators (&, |)")
+print("  [Log] Using Python bitwise operators for clean syntax:")
+# Note: Python requires parenthesis around conditions when using bitwise operators!
+q_d = Article.query().filter(
+    ((Article.author == "Alice") & (Article.status == "draft")) | (Article.score >= 4.9)
+)
+for art in q_d.fetch():
+    print(f"    -> {art.title} (Author: {art.author}, Status: {art.status}, Score: {art.score})")
+
+
+# ---------------------------------------------------------
+# Scenario E: Advanced Ordering (Descending and Ascending)
+# ---------------------------------------------------------
+print("\nScenario E: Sorting / Ordering (-/+)")
+print("  [Log] Sorting by descending score (-), then ascending title:")
+q_e = Article.query().order(-Article.score, Article.title)
+for art in q_e.fetch():
+    print(f"    -> {art.title} (Score: {art.score})")
+
+print("  [Log] Sorting published by descending score (-), then ascending title:")
+q_e2 = Article.query().filter(Article.status == "published").order(-Article.score, Article.title)
+for art in q_e2.fetch():
+    print(f"    -> {art.title} (Score: {art.score})")
+
+
+# ---------------------------------------------------------
+# Scenario F: Server-Side Aggregation (Count)
+# ---------------------------------------------------------
+print("\nScenario F: Server-Side Count Aggregation")
+print("  [Log] Executing CountAggregation (No payload download):")
+total_published = Article.query().filter(Article.status == "published").count()
+print(f"    -> Total published articles: {total_published}")
+
+print("\nExample Run Complete!")
+

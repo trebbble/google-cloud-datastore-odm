@@ -7,22 +7,20 @@ services:
     volumes:
       - datastore-dev:/datastore
     command: >
-      gcloud beta emulators datastore start
+      gcloud emulators firestore start
+      --database-mode=datastore-mode
       --project=google-cloud-datastore-odm-dev
       --host-port=0.0.0.0:8081
-      --data-dir=/datastore
-      --consistency=1.0
 
   datastore-test:
     image: gcr.io/google.com/cloudsdktool/google-cloud-cli:emulators
     ports:
       - "10001:8081"
     command: >
-      gcloud beta emulators datastore start
+      gcloud emulators firestore start
+      --database-mode=datastore-mode
       --project=google-cloud-datastore-odm-test
       --host-port=0.0.0.0:8081
-      --consistency=1.0
-      --no-store-on-disk
 
   emulators-ui:
     image: ghcr.io/drehelis/gcp-emulator-ui:main

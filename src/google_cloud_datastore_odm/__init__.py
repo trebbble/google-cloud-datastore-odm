@@ -11,6 +11,10 @@ from .properties import Property as Property
 from .properties import StringProperty as StringProperty
 from .properties import TextProperty as TextProperty
 from .properties import TimeProperty as TimeProperty
+from .query import AND as AND
+from .query import OR as OR
+from .query import and_ as and_
+from .query import or_ as or_
 
 __all__ = [
     "Model",
@@ -25,5 +29,9 @@ __all__ = [
     "JsonProperty",
     "DateTimeProperty",
     "DateProperty",
-    "TimeProperty"
+    "TimeProperty",
+    "and_",
+    "AND",
+    "or_",
+    "OR"
 ]
