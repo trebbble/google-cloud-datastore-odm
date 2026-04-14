@@ -217,30 +217,46 @@ ordered_query = Article.query().filter(Article.status == "published").order(-Art
 # Fast Server-Side Count Aggregation (Does not download entities)
 total_published = Article.query().filter(Article.status == "published").count()
 
-# --- Advanced Querying ---
-
 # The NDB-style .get() method (Returns the first matching entity or None)
 first_draft = Article.query().filter(Article.status == "draft").get()
 
 # Keys-Only Queries (Extremely fast, does not download document payloads)
 # Yields google.cloud.datastore.Key objects instead of Model instances
-all_article_keys = list(Article.query().fetch(keys_only=True))
+all_article_keys = list(Article.query().keys_only().fetch())
 
 # Projection Queries (Download only specific fields to save memory/bandwidth)
 # accepts Properties or raw datastore fields as strings
 # Note: Accessing unprojected fields (like 'title' or 'tags') on these objects will safely raise an AttributeError.
 # Attempting to .put() a projected entity will raise a RuntimeError to prevent data loss.
-lightweight_articles = list(Article.query().fetch(projection=[Article.author, Article.status, 'word_count']))
+lightweight_articles = list(Article.query().projection(Article.author, Article.status, 'word_count').fetch())
 
 # Distinct Queries (Get the first full document for each unique category)
 # Accepts Python Property descriptors or raw Datastore field names as strings.
-first_articles_by_author = list(Article.query().fetch(distinct_on=[Article.author]))
+first_articles_by_author = list(Article.query().distinct_on(Article.author).fetch())
 
 # Distinct + Projection (Get lightweight combinations of unique categories)
-unique_author_statuses = list(Article.query().fetch(
-    projection=[Article.author, Article.status], 
-    distinct_on=[Article.author, Article.status]
-))
+unique_author_statuses = list(Article.query().projection(
+    Article.author, Article.status
+).distinct_on(
+    Article.author, Article.status
+).fetch())
+
+# Pagination with cursors
+query = (
+    Article.query()
+    .order(Article.author)
+    .projection(Article.author, Article.title)
+    .distinct_on(Article.author)
+)
+
+cursor = None
+has_more = True
+
+while has_more:
+    page, cursor, has_more = query.fetch_page(page_size=2, start_cursor=cursor)
+
+    for article in page:
+        print(f"{article.author} - {article.title}")
 ```
 
 ## 6. Strict Equality

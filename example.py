@@ -472,7 +472,7 @@ adv_articles = [
 Article.put_multi(adv_articles)
 
 # ---------------------------------------------------------
-# Scenario A: Explicit and Implicit AND Logic
+# Explicit and Implicit AND Logic
 # ---------------------------------------------------------
 print("\nScenario A: Explicit and Implicit AND logic")
 
@@ -496,7 +496,7 @@ for art in q_a3.fetch():
 
 
 # ---------------------------------------------------------
-# Scenario B: Composite OR logic variations
+# Composite OR logic variations
 # ---------------------------------------------------------
 print("\nScenario B: Composite OR Queries")
 
@@ -517,7 +517,7 @@ for art in q_b3.fetch():
     print(f"    -> {art.title} (Author: {art.author}, Tags: {art.tags})")
 
 # ---------------------------------------------------------
-# Scenario C: IN and NOT IN operators (Native)
+# IN and NOT IN operators (Native)
 # ---------------------------------------------------------
 print("\nScenario C: IN and NOT IN operators")
 
@@ -547,7 +547,7 @@ for art in q_c5.fetch():
     print(f"    -> {art.title} (Tags: {art.tags})")
 
 # ---------------------------------------------------------
-# Scenario D: Bitwise logical operators (& and |)
+# Bitwise logical operators (& and |)
 # ---------------------------------------------------------
 print("\nScenario D: Bitwise Logical Operators (&, |)")
 print("  [Log] Using Python bitwise operators for clean syntax:")
@@ -560,7 +560,7 @@ for art in q_d.fetch():
 
 
 # ---------------------------------------------------------
-# Scenario E: Advanced Ordering (Descending and Ascending)
+# Advanced Ordering (Descending and Ascending)
 # ---------------------------------------------------------
 print("\nScenario E: Sorting / Ordering (-/+)")
 print("  [Log] Sorting by descending score (-), then ascending title:")
@@ -575,7 +575,7 @@ for art in q_e2.fetch():
 
 
 # ---------------------------------------------------------
-# Scenario F: Server-Side Aggregation (Count)
+# Server-Side Aggregation (Count)
 # ---------------------------------------------------------
 print("\nScenario F: Server-Side Count Aggregation")
 print("  [Log] Executing CountAggregation (No payload download):")
@@ -583,14 +583,9 @@ total_published = Article.query().filter(Article.status == "published").count()
 print(f"    -> Total published articles: {total_published}")
 
 # ---------------------------------------------------------
-# Scenario G: Passthrough queries
+# Passthrough queries
 # ---------------------------------------------------------
 print("\nScenario G: Passthrough queries")
-Article(title="Tutorial: Python ODM", author="John", status="published", word_count=1200, tags=["tutorial"]).put()
-Article(title="Advanced Queries", author="Alicia", status="published", word_count=800, tags=["advanced"]).put()
-
-# Note: Datastore filters use the Datastore alias name under the hood,
-# but for now we filter using the mapped names.
 results: list[Article] = list(Article.query().filter("author_name", "=", "Alice").fetch())
 print(f"Alice's articles: {len(results)} found")
 for r in results:
@@ -599,7 +594,7 @@ for r in results:
 
 
 # ---------------------------------------------------------
-# Scenario H: Query parameters
+# Get first or none
 # ---------------------------------------------------------
 
 # The classic Query.get() - Returns the first draft it finds or None
@@ -609,15 +604,20 @@ print(f"First draft: {first_draft}")
 non_existing_status = Article.query().filter(Article.status == "dummy").get()
 print(f"Wrong status: {non_existing_status}")
 
+# ---------------------------------------------------------
 # Distinct
-unique_authors = list(Article.query().fetch(distinct_on=[Article.author]))
+# ---------------------------------------------------------
+
+unique_authors = list(Article.query().distinct_on(Article.author).fetch())
 print(f"\nUnique authors: {len(unique_authors)} found")
 for r in unique_authors:
     r: Article
     print(f"- {r.author}")
 
+# ---------------------------------------------------------
 # Projection
-just_authors = list(Article.query().fetch(projection=[Article.author]))
+# ---------------------------------------------------------
+just_authors = list(Article.query().projection(Article.author).fetch())
 print(f"\nAll authors: {len(unique_authors)} found")
 for r in just_authors:
     r: Article
@@ -628,16 +628,40 @@ try:
 except AttributeError as e:
     print(e)
 
+# ---------------------------------------------------------
 # Projection & Distinct
-unique_authors = list(Article.query().fetch(projection=[Article.author, 'title'], distinct_on=[Article.author]))
+# ---------------------------------------------------------
+unique_authors = list(Article.query().projection(Article.author, 'title').distinct_on(Article.author).fetch())
 print(f"\nUnique authors with titles: {len(unique_authors)} found")
 for r in unique_authors:
     r: Article
     print(f"- {r}")
 
+# ---------------------------------------------------------
 # Keys Only Fetching - Super fast, doesn't download document payloads
-all_keys = list(Article.query().fetch(keys_only=True))
+# ---------------------------------------------------------
+all_keys = list(Article.query().keys_only().fetch())
 print(f"\nFound {len(all_keys)} keys")
 
+# ---------------------------------------------------------
+# --- Pagination / Cursors ---
+# ---------------------------------------------------------
+print("\n--- Pagination / Cursors ---")
+
+query = (
+    Article.query()
+    .order(Article.author)
+    .projection(Article.author, Article.title)
+    .distinct_on(Article.author)
+)
+
+cursor = None
+has_more = True
+
+while has_more:
+    page, cursor, has_more = query.fetch_page(page_size=2, start_cursor=cursor)
+
+    for article in page:
+        print(f"{article.author} - {article.title}")
 
 print("\nExample Run Complete!")

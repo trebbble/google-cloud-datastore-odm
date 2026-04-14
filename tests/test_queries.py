@@ -1,3 +1,5 @@
+from unittest.mock import MagicMock, patch
+
 import pytest
 from google.cloud.datastore import Key, query
 
@@ -253,7 +255,7 @@ def test_query_translate_unknown_node():
 
 def test_query_keys_only(seed_data):
     """Ensure keys_only=True returns Datastore Keys instead of Model instances."""
-    results = list(QueryTestModel.query().fetch(keys_only=True))
+    results = list(QueryTestModel.query().keys_only().fetch())
 
     assert len(results) == 4
     for result in results:
@@ -263,7 +265,7 @@ def test_query_keys_only(seed_data):
 
 def test_query_projection(seed_data):
     """Ensure projection queries return partial models and block unrequested fields."""
-    results = list(QueryTestModel.query().fetch(projection=["name"]))
+    results = list(QueryTestModel.query().projection("name").fetch())
 
     assert len(results) == 4
     for result in results:
@@ -282,7 +284,7 @@ def test_query_projection(seed_data):
 def test_query_distinct(seed_data):
     """Ensure distinct_on filters out duplicate rows based on the projection."""
     unique_authors = list(
-        QueryTestModel.query().fetch(projection=[QueryTestModel.name], distinct_on=[QueryTestModel.name])
+        QueryTestModel.query().projection(QueryTestModel.name).distinct_on(QueryTestModel.name).fetch()
     )
 
     assert len(unique_authors) == 3
@@ -300,9 +302,8 @@ def test_query_get(seed_data):
     nobody = QueryTestModel.query().filter(QueryTestModel.name == "Zebra").get()
     assert nobody is None
 
-    projected_bob: QueryTestModel = QueryTestModel.query().filter(QueryTestModel.name == "Bob").get(
-        projection=[QueryTestModel.age]
-    )
+    projected_bob: QueryTestModel = QueryTestModel.query().filter(QueryTestModel.name == "Bob"
+                                                                  ).projection(QueryTestModel.age).get()
     assert getattr(projected_bob, "_is_projected", False) is True
     assert projected_bob.age == 30
 
@@ -312,10 +313,67 @@ def test_query_get(seed_data):
 
 def test_query_build_projection_mapping():
     """Ensure _build correctly maps Property descriptors to Datastore names."""
-    q = ASTUser.query()
+    q = ASTUser.query().projection(ASTUser.role, "name")
 
-    native_query = q._build(projection=[ASTUser.role, "name"])
+    native_query = q._build()
     assert native_query.projection == ["db_role", "name"]
 
-    native_distinct = q._build(projection=[ASTUser.role, "name"], distinct_on=["db_role", ASTUser.name])
+    q = ASTUser.query().projection(ASTUser.role, "name").distinct_on("db_role", ASTUser.name)
+    native_distinct = q._build()
     assert native_distinct.distinct_on == ["db_role", "name"]
+
+
+def test_query_fetch_page_lifecycle(seed_data):
+    """Ensure fetch_page correctly paginates through results using cursors."""
+    q = QueryTestModel.query().order("age")
+
+    page_1, cursor_1, has_more_1 = q.fetch_page(page_size=2)
+    assert len(page_1) == 2
+    assert page_1[0].age == 25
+    assert page_1[1].age == 30
+    assert has_more_1 is True
+    assert cursor_1 is not None
+
+    page_2, cursor_2, has_more_2 = q.fetch_page(page_size=2, start_cursor=cursor_1)
+    assert len(page_2) == 2
+    assert page_2[0].age == 35
+    assert page_2[1].age == 40
+
+    assert has_more_2 is False
+    assert cursor_2 is None
+
+
+def test_query_fetch_all_in_one_page(seed_data):
+    page, cursor, has_more = QueryTestModel.query().fetch_page(page_size=5)
+
+    assert len(page) == 4
+    assert has_more is False
+    assert cursor is None
+
+
+def test_query_fetch_page_keys_only(seed_data):
+    """Ensure fetch_page respects keys_only."""
+    page, cursor, has_more = QueryTestModel.query().keys_only().fetch_page(page_size=3)
+
+    assert len(page) == 3
+    assert isinstance(page[0], Key)
+    assert has_more is True
+    assert cursor is not None
+
+
+def test_query_fetch_page_stop_iteration():
+    """Ensure fetch_page safely catches StopIteration if the SDK returns zero pages."""
+    q = QueryTestModel.query()
+
+    # Create a mock native query where the 'pages' property is an empty generator
+    mock_native_query = MagicMock()
+    mock_native_query.fetch.return_value.pages = iter([])
+
+    # Patch the _build method to return our mock instead of a real SDK query
+    with patch.object(q, '_build', return_value=mock_native_query):
+        page, cursor, has_more = q.fetch_page(page_size=10)
+
+    # Assert the fallback block worked perfectly
+    assert page == []
+    assert cursor is None
+    assert has_more is False
