@@ -55,16 +55,16 @@ https://trebbble.github.io/google-cloud-datastore-odm/
     - [x] BooleanProperty
     - [x] IntegerProperty
     - [x] FloatProperty
-    - [ ] BlobProperty
-    - [ ] CompressedTextProperty
+    - [ ] ~~BlobProperty~~ --> BytesProperty, to be supported but renamed 
+    - [ ] ~~CompressedTextProperty~~ --> support with `compressed` argument
     - [x] TextProperty
     - [x] StringProperty
     - [ ] GeoPtProperty
     - [ ] PickleProperty
     - [x] JsonProperty
-    - [ ] UserProperty
+    - [ ] ~~UserProperty~~ Deprecated, to be dropped.
     - [ ] KeyProperty
-    - [ ] BlobKeyProperty
+    - [ ] ~~BlobKeyProperty~~ Deprecated, to be dropped.
     - [x] DateTimeProperty
     - [x] DateProperty
     - [x] TimeProperty

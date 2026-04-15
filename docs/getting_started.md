@@ -262,11 +262,7 @@ total_published = base_query.count()
 total_words = base_query.sum(Article.word_count)
 average_words = base_query.avg(Article.word_count)
 
-print(f"Total published articles: {total_published}")
-print(f"Total Words Written: {total_words}")
-print(f"Average Words per Article: {average_words:.1f}")
-
-print("\n--- Batch Aggregations ---")
+# or with one RPC
 stats = base_query.aggregate(
     total_articles=Count(),
     total_words=Sum(Article.word_count),
