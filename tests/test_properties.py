@@ -172,9 +172,31 @@ def test_text_property():
     instance = TextModel()
     instance.body = "A very long text block..."
     assert instance.body == "A very long text block..."
+    prop = TextModel._properties['body']
+
+    assert prop._to_base_type("normal string") == "normal string"
+    assert prop._from_base_type("normal string") == "normal string"
 
     with pytest.raises(TypeError):
         instance.body = 123
+
+    with pytest.raises(TypeError):
+        prop._to_base_type(123)
+
+    with pytest.raises(ValueError):
+        class BadTextModel(Model):
+            body = TextProperty(indexed=True)
+
+    class CompressedTextModel(Model):
+        body = TextProperty(compressed=True)
+
+    prop = CompressedTextModel._properties['body']
+
+    datastore_value = prop._to_base_type("Compress me please")
+    assert isinstance(datastore_value, bytes)
+
+    python_value = prop._from_base_type(datastore_value)
+    assert python_value == "Compress me please"
 
 
 def test_json_property():
@@ -199,6 +221,33 @@ def test_json_property():
 
     with pytest.raises(TypeError):
         instance.data = CustomObj()
+
+    with pytest.raises(ValueError):
+        class BadJsonModel(Model):
+            data = JsonProperty(indexed=True)
+
+    class CompressedJsonModel(Model):
+        data = JsonProperty(compressed=True)
+
+    prop = CompressedJsonModel._properties['data']
+    test_payload = {"deep": {"nested": "value"}}
+
+    datastore_value = prop._to_base_type(test_payload)
+    assert isinstance(datastore_value, bytes)
+
+    python_value = prop._from_base_type(datastore_value)
+    assert python_value == test_payload
+
+    assert prop._to_base_type(None) is None
+
+    prop = JsonModel._properties['data']
+    assert prop._to_base_type({"key": "value"}) == {"key": "value"}
+
+    class UnserializableObject:
+        pass
+
+    with pytest.raises(TypeError, match="must be JSON serializable"):
+        prop._to_base_type(UnserializableObject())
 
 
 def test_field_descriptor_delete():

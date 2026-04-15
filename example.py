@@ -73,10 +73,10 @@ class Article(Model):
     # Unindexed string (cannot be filtered on in queries)
     internal_notes = StringProperty(indexed=False)
 
-    # Automatically unindexed by default (safe for >1500 bytes)
+    # Automatically unindexed
     body = TextProperty()
 
-    # Automatically unindexed by default (safe for deep dicts/lists)
+    # Automatically unindexed
     metadata: dict | list = JsonProperty()
 
     # -----------------------------------------------------------------------

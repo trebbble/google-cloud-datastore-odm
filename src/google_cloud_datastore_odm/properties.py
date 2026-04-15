@@ -8,6 +8,7 @@ validation, default values, and Datastore schema mapping.
 
 import datetime
 import json
+import zlib
 from typing import TYPE_CHECKING, Any, Callable, List, Optional
 
 if TYPE_CHECKING:
@@ -394,32 +395,48 @@ class FloatProperty(Property):
 class TextProperty(StringProperty):
     """A Datastore property for large strings.
 
-    Identical to StringProperty, but safely defaults to `indexed=False`.
-    Google Cloud Datastore imposes a 1500-byte limit on indexed strings.
-    Use this property for article bodies, comments, and large blobs of text.
+    Unlike StringProperty, this is strictly unindexed to bypass Datastore's
+    1500-byte limit. It also supports optional zlib compression for saving space.
     """
 
-    def __init__(self, **kwargs: Any):
-        """Initialize the TextProperty, forcing indexed to False by default."""
-        kwargs.setdefault("indexed", False)
+    def __init__(self, compressed: bool = False, **kwargs: Any):
+        if kwargs.get("indexed"):
+            raise ValueError("TextProperty cannot be indexed. Use StringProperty instead.")
+
+        kwargs["indexed"] = False
         super().__init__(**kwargs)
+        self.compressed = compressed
+
+    def _to_base_type(self, value: Any) -> Any:
+        if not isinstance(value, str):
+            raise TypeError(f"Property '{self._python_name}' requires a string.")
+
+        if self.compressed:
+            return zlib.compress(value.encode('utf-8'))
+        return value
+
+    def _from_base_type(self, value: Any) -> str:
+        if self.compressed and isinstance(value, bytes):
+            return zlib.decompress(value).decode('utf-8')
+        return value
 
 
 class JsonProperty(Property):
     """A Datastore property that enforces JSON-serializable structures.
 
-    This property acts as a safety net to ensure that complex nested structures
-    (dicts, lists) are valid JSON. To prevent Datastore index explosion on
-    arbitrarily nested keys, it defaults to `indexed=False`.
-
-    Note: The underlying Google Cloud Datastore client will natively save these
-    structures as `EmbeddedEntity` or `ListValue` items in the database.
+    This property strictly defaults to `indexed=False` to prevent Datastore
+    index explosions on arbitrarily nested dynamic keys. It also supports
+    optional zlib compression to drastically reduce storage costs for massive
+    JSON payloads.
     """
 
-    def __init__(self, **kwargs: Any):
-        """Initialize the JsonProperty, forcing indexed to False by default."""
-        kwargs.setdefault("indexed", False)
+    def __init__(self, compressed: bool = False, **kwargs: Any):
+        if kwargs.get("indexed"):
+            raise ValueError("JsonProperty cannot be indexed. Use StructuredProperty instead.")
+
+        kwargs["indexed"] = False
         super().__init__(**kwargs)
+        self.compressed = compressed
 
     def _validate_type(self, value: Any) -> Any:
         """Enforce that the value is JSON-serializable."""
@@ -429,9 +446,24 @@ class JsonProperty(Property):
             raise TypeError(f"Property '{self._python_name}' must be JSON serializable: {e}") from e
         return value
 
+    def _to_base_type(self, value: Any) -> Any:
+        """Sanitize and optionally compress the data before saving."""
+        if value is None:
+            return None
+
+        try:
+            json_str = json.dumps(value)
+        except (TypeError, ValueError) as e:
+            raise TypeError(f"Property '{self._python_name}' must be JSON serializable: {e}") from e
+
+        if self.compressed:
+            return zlib.compress(json_str.encode('utf-8'))
+
+        return json.loads(json_str)
+
     def _from_base_type(self, value: Any) -> Any:
         """
-        Sanitize the value coming back from the Datastore.
+        Decompress (if needed) and sanitize data coming from Datastore.
 
         Datastore natively converts nested dictionaries into `datastore.Entity`
         objects. This round-trips the data through JSON to recursively strip
@@ -439,6 +471,10 @@ class JsonProperty(Property):
         """
         if value is None:
             return None
+
+        if self.compressed and isinstance(value, bytes):
+            json_str = zlib.decompress(value).decode('utf-8')
+            return json.loads(json_str)
 
         return json.loads(json.dumps(value))
 

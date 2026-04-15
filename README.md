@@ -55,8 +55,10 @@ https://trebbble.github.io/google-cloud-datastore-odm/
     - [x] BooleanProperty
     - [x] IntegerProperty
     - [x] FloatProperty
-    - [ ] ~~BlobProperty~~ --> BytesProperty, to be supported but renamed 
-    - [ ] ~~CompressedTextProperty~~ --> support with `compressed` argument
+    - [ ] ~~BlobProperty~~ --> to be supported but renamed to `BytesProperty` 
+    - [ ] ~~CompressedTextProperty~~ --> support with `compressed` argument in properties that make sense:
+       - TextProperty
+       - JsonProperty
     - [x] TextProperty
     - [x] StringProperty
     - [ ] GeoPtProperty
@@ -69,7 +71,7 @@ https://trebbble.github.io/google-cloud-datastore-odm/
     - [x] DateProperty
     - [x] TimeProperty
     - [ ] StructuredProperty
-    - [ ] LocalStructuredProperty
+    - [ ] ~~LocalStructuredProperty~~ To be dropped. If structured and indexed is needed one can use StructuredProperty. If structured but not indexexed is needed, then they can use JsonProperty
     - [ ] GenericProperty
     - [ ] ComputedProperty
   - [ ] Polymodel Support
