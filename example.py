@@ -16,6 +16,7 @@ from src.google_cloud_datastore_odm import (
     OR,
     Avg,
     BooleanProperty,
+    BytesProperty,
     Count,
     DateProperty,
     DateTimeProperty,
@@ -54,6 +55,7 @@ class Article(Model):
     # Built-in choices validation
     status = StringProperty(default="draft", choices=["draft", "published", "archived"])
     rating = IntegerProperty(choices=[1, 2, 3, 4, 5])
+    attachment_raw = BytesProperty(compressed=True)
 
     word_count = IntegerProperty(default=0)
 
@@ -178,6 +180,7 @@ article = Article(
     word_count=500,
     is_featured=True,
     score=98.5,
+    attachment_raw=b'some raw bytes data',
     publish_date=datetime.date.today(),
     publish_time=datetime.datetime.now(datetime.timezone.utc).time(),
     tags=["python", "odm"],

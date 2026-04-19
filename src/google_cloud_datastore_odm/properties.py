@@ -302,6 +302,46 @@ class Property:
     NOT_IN = not_in_
 
 
+class BytesProperty(Property):
+    """A Datastore property for raw byte data.
+
+    This replaces the legacy `BlobProperty`. It is strictly unindexed to bypass
+    Datastore's 1500-byte limit for indexed properties. It also supports optional
+    zlib compression to reduce storage costs for large binary payloads.
+    """
+
+    def __init__(self, compressed: bool = False, **kwargs: Any):
+        if kwargs.get("indexed"):
+            raise ValueError(
+                "BytesProperty cannot be indexed."
+            )
+
+        kwargs["indexed"] = False
+        super().__init__(**kwargs)
+        self.compressed = compressed
+
+    def _validate_type(self, value: Any) -> Any:
+        if not isinstance(value, bytes):
+            raise TypeError(f"Property '{self._python_name}' requires bytes.")
+        return value
+
+    def _to_base_type(self, value: Any) -> Any:
+        if value is None:
+            return None
+
+        if self.compressed:
+            return zlib.compress(value)
+        return value
+
+    def _from_base_type(self, value: Any) -> Any:
+        if value is None:
+            return None
+
+        if self.compressed and isinstance(value, bytes):
+            return zlib.decompress(value)
+        return value
+
+
 class StringProperty(Property):
     """A Datastore property that strictly enforces string values."""
 

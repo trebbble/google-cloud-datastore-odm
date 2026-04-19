@@ -27,6 +27,7 @@ Models are defined by inheriting from the `Model` class. You map Datastore field
 ```python
 import datetime
 from src.google_cloud_datastore_odm import (
+    BytesProperty,
     BooleanProperty,
     DateProperty,
     DateTimeProperty,
@@ -57,10 +58,12 @@ class Article(Model):
     tags = StringProperty(repeated=True)
     # Unindexed string (cannot be filtered on in queries)
     internal_notes = StringProperty(indexed=False)
-    # Automatically unindexed
-    body = TextProperty()
-    # Automatically unindexed
+    # Automatically unindexed, optionally compressed
+    body = TextProperty(compressed=True)
+    # Automatically unindexed, optionally compressed
     metadata: dict | list = JsonProperty()
+    # Automatically unindexed, optionally compressed
+    attachment_raw = BytesProperty(compressed=True)
 ```
 ## 3. Validation
 

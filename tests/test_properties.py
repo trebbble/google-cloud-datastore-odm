@@ -6,6 +6,7 @@ from google.cloud import datastore
 from src.google_cloud_datastore_odm.model import Model, field_validator
 from src.google_cloud_datastore_odm.properties import (
     BooleanProperty,
+    BytesProperty,
     DateProperty,
     DateTimeProperty,
     FloatProperty,
@@ -561,3 +562,41 @@ def test_date_and_time_auto_now_add_triggers():
 
     assert isinstance(instance.d, datetime.date)
     assert isinstance(instance.t, datetime.time)
+
+
+def test_bytes_property():
+    class BytesModel(Model):
+        blob = BytesProperty()
+
+    prop = BytesModel._properties['blob']
+    assert prop.indexed is False
+    raw_data = b"raw byte data"
+    assert prop._to_base_type(raw_data) is raw_data
+    assert prop._from_base_type(raw_data) is raw_data
+
+    instance = BytesModel()
+    instance.blob = b"raw byte data"
+    assert instance.blob == b"raw byte data"
+
+    with pytest.raises(TypeError, match="requires bytes"):
+        instance.blob = "I am a string, not bytes"
+
+    with pytest.raises(ValueError, match="cannot be indexed"):
+        class BadBytesModel(Model):
+            blob = BytesProperty(indexed=True)
+
+    class CompressedBytesModel(Model):
+        blob = BytesProperty(compressed=True)
+
+    prop = CompressedBytesModel._properties['blob']
+    original_data = b"compress this repetitive byte sequence " * 20
+
+    datastore_value = prop._to_base_type(original_data)
+    assert isinstance(datastore_value, bytes)
+    assert len(datastore_value) < len(original_data)
+
+    python_value = prop._from_base_type(datastore_value)
+    assert python_value == original_data
+
+    assert prop._to_base_type(None) is None
+    assert prop._from_base_type(None) is None
