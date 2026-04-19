@@ -8,6 +8,7 @@ from .properties import DateTimeProperty as DateTimeProperty
 from .properties import FloatProperty as FloatProperty
 from .properties import IntegerProperty as IntegerProperty
 from .properties import JsonProperty as JsonProperty
+from .properties import KeyProperty as KeyProperty
 from .properties import Property as Property
 from .properties import StringProperty as StringProperty
 from .properties import TextProperty as TextProperty
@@ -23,6 +24,7 @@ __all__ = [
     "field_validator",
     "model_validator",
     "Property",
+    "KeyProperty",
     "BytesProperty",
     "StringProperty",
     "TextProperty",

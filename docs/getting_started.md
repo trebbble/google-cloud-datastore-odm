@@ -27,6 +27,7 @@ Models are defined by inheriting from the `Model` class. You map Datastore field
 ```python
 import datetime
 from src.google_cloud_datastore_odm import (
+    KeyProperty,
     BytesProperty,
     BooleanProperty,
     DateProperty,
@@ -40,11 +41,15 @@ from src.google_cloud_datastore_odm import (
     TimeProperty,
 )
 
+class User(Model):
+    email = StringProperty()
+
 class Article(Model):
 
     title = StringProperty(required=True)
     # Maps 'author' in Python to 'author_name' in Datastore
     author = StringProperty(required=True, name="author_name")
+    author_key = KeyProperty(kind=User, required=True)
     status = StringProperty(default="draft", choices=["draft", "published", "archived"])
     rating = IntegerProperty(choices=[1, 2, 3, 4, 5])
     word_count = IntegerProperty(default=0)

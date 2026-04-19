@@ -65,7 +65,7 @@ https://trebbble.github.io/google-cloud-datastore-odm/
     - [ ] PickleProperty
     - [x] JsonProperty
     - [x] ~~UserProperty~~ Deprecated, to be dropped.
-    - [ ] KeyProperty
+    - [x] KeyProperty
     - [x] ~~BlobKeyProperty~~ Deprecated, to be dropped.
     - [x] DateTimeProperty
     - [x] DateProperty

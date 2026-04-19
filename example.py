@@ -23,6 +23,7 @@ from src.google_cloud_datastore_odm import (
     FloatProperty,
     IntegerProperty,
     JsonProperty,
+    KeyProperty,
     Model,
     StringProperty,
     Sum,
@@ -47,10 +48,18 @@ load_dotenv()
 #    - name: Maps the Python attribute to a legacy/different Datastore column name.
 # ---------------------------------------------------------------------------
 
+class Author(Model):
+    """A standalone Author model to demonstrate relational data."""
+    name = StringProperty(required=True)
+    email = StringProperty()
+
+
 class Article(Model):
     title = StringProperty(required=True)
     # Maps 'author' in Python to 'author_name' in Datastore
     author = StringProperty(required=True, name="author_name")
+
+    author_key = KeyProperty(kind=Author)
 
     # Built-in choices validation
     status = StringProperty(default="draft", choices=["draft", "published", "archived"])
@@ -685,5 +694,35 @@ while has_more:
 
     for article in page:
         print(f"{article.author} - {article.title}")
+
+print("\nExample Run Complete!")
+
+
+# ---------------------------------------------------------------------------
+# 20. Relational Data (KeyProperty)
+# ---------------------------------------------------------------------------
+
+print("\n--- 20. Relational KeyProperty ---")
+
+alice_writer = Author(name="Alice Writer", email="alice@example.com")
+alice_writer.put()
+print(f"Saved Author: {alice_writer.name} with Key: {alice_writer.key.id_or_name}")
+
+relational_article = Article(
+    title="Understanding NoSQL Relationships",
+    author="Alice Writer",
+    author_key=alice_writer.key,
+    status="published",
+    word_count=1200
+)
+relational_article.put()
+print(f"Saved Article! Linked to Author Key: {relational_article.author_key}")
+
+my_articles = list(Article.query().filter(Article.author_key == alice_writer.key).fetch())
+print(f"\nFound {len(my_articles)} article(s) linked directly to the Author entity:")
+for a in my_articles:
+    print(f"  -> {a.title} (Author Key matched perfectly!)")
+    author = Article.get(a.author_key)
+    print(f"  - {author}")
 
 print("\nExample Run Complete!")

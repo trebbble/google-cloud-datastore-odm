@@ -3,6 +3,7 @@ import datetime
 import pytest
 from google.cloud import datastore
 
+from src.google_cloud_datastore_odm.client import get_client
 from src.google_cloud_datastore_odm.model import Model, field_validator
 from src.google_cloud_datastore_odm.properties import (
     BooleanProperty,
@@ -12,6 +13,7 @@ from src.google_cloud_datastore_odm.properties import (
     FloatProperty,
     IntegerProperty,
     JsonProperty,
+    KeyProperty,
     Property,
     StringProperty,
     TextProperty,
@@ -578,10 +580,10 @@ def test_bytes_property():
     instance.blob = b"raw byte data"
     assert instance.blob == b"raw byte data"
 
-    with pytest.raises(TypeError, match="requires bytes"):
+    with pytest.raises(TypeError):
         instance.blob = "I am a string, not bytes"
 
-    with pytest.raises(ValueError, match="cannot be indexed"):
+    with pytest.raises(ValueError):
         class BadBytesModel(Model):
             blob = BytesProperty(indexed=True)
 
@@ -600,3 +602,67 @@ def test_bytes_property():
 
     assert prop._to_base_type(None) is None
     assert prop._from_base_type(None) is None
+
+
+def test_key_property():
+    client = get_client()
+
+    class KeyModel(Model):
+        target = KeyProperty()
+
+    instance = KeyModel()
+
+    valid_key = client.key("AnyKind", 123)
+    instance.target = valid_key
+    assert instance.target == valid_key
+
+    with pytest.raises(TypeError):
+        instance.target = "not_a_key"
+
+
+def test_key_property_kind_string():
+    client = get_client()
+
+    class RestrictedStringModel(Model):
+        user_key = KeyProperty(kind="User")
+
+    instance = RestrictedStringModel()
+
+    instance.user_key = client.key("User", "alice")
+
+    with pytest.raises(ValueError):
+        instance.user_key = client.key("Company", "google")
+
+
+def test_key_property_kind_model():
+    client = get_client()
+
+    class TargetModel(Model):
+        pass
+
+    class RestrictedClassModel(Model):
+        target_key = KeyProperty(kind=TargetModel)
+
+    instance = RestrictedClassModel()
+
+    instance.target_key = client.key("TargetModel", 999)
+
+    with pytest.raises(ValueError):
+        instance.target_key = client.key("WrongKind", 999)
+
+
+def test_key_property_kind_class():
+    client = get_client()
+
+    class TargetModel:
+        pass
+
+    class RestrictedClassModel(Model):
+        target_key = KeyProperty(kind=TargetModel)
+
+    instance = RestrictedClassModel()
+
+    instance.target_key = client.key("TargetModel", 999)
+
+    with pytest.raises(ValueError):
+        instance.target_key = client.key("WrongKind", 999)

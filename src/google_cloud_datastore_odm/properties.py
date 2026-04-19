@@ -9,7 +9,9 @@ validation, default values, and Datastore schema mapping.
 import datetime
 import json
 import zlib
-from typing import TYPE_CHECKING, Any, Callable, List, Optional
+from typing import TYPE_CHECKING, Any, Callable, List, Optional, Union
+
+from google.cloud.datastore import Key
 
 if TYPE_CHECKING:
     from .model import Model
@@ -300,6 +302,54 @@ class Property:
 
     IN = in_
     NOT_IN = not_in_
+
+
+class KeyProperty(Property):
+    """A Datastore property that enforces Datastore Key values.
+
+    This property acts as a foreign key to create relationships between entities.
+    It can optionally be restricted to only accept keys of a specific entity kind.
+    """
+
+    def __init__(self, kind: Optional[Union[str, Any]] = None, **kwargs: Any):
+        """Initialize a new KeyProperty.
+
+        Args:
+            kind (Optional[Union[str, Any]]): A string or Model class to restrict
+                the allowed keys. If provided, assigning a key of a different
+                kind will raise a ValueError.
+            **kwargs: Additional base property arguments.
+        """
+        super().__init__(**kwargs)
+        self._model = kind
+
+    @property
+    def expected_kind(self) -> Optional[str]:
+        """Resolve the expected kind string from a string or Model class."""
+        if self._model is None:
+            return None
+
+        if isinstance(self._model, str):
+            return self._model
+
+        if hasattr(self._model, "kind") and callable(self._model.kind):
+            return self._model.kind()
+
+        return self._model.__name__
+
+    def _validate_type(self, value: Any) -> Any:
+        """Enforce that the value is a Datastore Key of the correct kind."""
+        if not isinstance(value, Key):
+            raise TypeError(f"Property '{self._python_name}' must be a google.cloud.datastore.Key")
+
+        expected = self.expected_kind
+        if expected and value.kind != expected:
+            raise ValueError(
+                f"Property '{self._python_name}' expected a Key of kind '{expected}', "
+                f"but got '{value.kind}'"
+            )
+
+        return value
 
 
 class BytesProperty(Property):
