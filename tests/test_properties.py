@@ -227,7 +227,7 @@ def test_json_property():
 
     with pytest.raises(ValueError):
         class BadJsonModel(Model):
-            data = JsonProperty(indexed=True)
+            data = JsonProperty(indexed=True, compressed=True)
 
     class CompressedJsonModel(Model):
         data = JsonProperty(compressed=True)
@@ -585,7 +585,7 @@ def test_bytes_property():
 
     with pytest.raises(ValueError):
         class BadBytesModel(Model):
-            blob = BytesProperty(indexed=True)
+            blob = BytesProperty(indexed=True, compressed=True)
 
     class CompressedBytesModel(Model):
         blob = BytesProperty(compressed=True)

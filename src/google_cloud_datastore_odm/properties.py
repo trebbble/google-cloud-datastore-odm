@@ -355,16 +355,16 @@ class KeyProperty(Property):
 class BytesProperty(Property):
     """A Datastore property for raw byte data.
 
-    This replaces the legacy `BlobProperty`. It is strictly unindexed to bypass
+    This replaces the legacy `BlobProperty`. It is by default unindexed to bypass
     Datastore's 1500-byte limit for indexed properties. It also supports optional
     zlib compression to reduce storage costs for large binary payloads.
     """
 
     def __init__(self, compressed: bool = False, **kwargs: Any):
-        if kwargs.get("indexed"):
-            raise ValueError(
-                "BytesProperty cannot be indexed."
-            )
+        kwargs.setdefault("indexed", False)
+
+        if compressed and kwargs.get("indexed"):
+            raise ValueError("A BytesProperty cannot be both compressed and indexed.")
 
         kwargs["indexed"] = False
         super().__init__(**kwargs)
@@ -514,15 +514,17 @@ class TextProperty(StringProperty):
 class JsonProperty(Property):
     """A Datastore property that enforces JSON-serializable structures.
 
-    This property strictly defaults to `indexed=False` to prevent Datastore
+    This property defaults to `indexed=False` to prevent Datastore
     index explosions on arbitrarily nested dynamic keys. It also supports
     optional zlib compression to drastically reduce storage costs for massive
     JSON payloads.
     """
 
     def __init__(self, compressed: bool = False, **kwargs: Any):
-        if kwargs.get("indexed"):
-            raise ValueError("JsonProperty cannot be indexed. Use StructuredProperty instead.")
+        kwargs.setdefault("indexed", False)
+
+        if compressed and kwargs.get("indexed"):
+            raise ValueError("A JsonProperty cannot be both compressed and indexed.")
 
         kwargs["indexed"] = False
         super().__init__(**kwargs)
