@@ -563,10 +563,16 @@ class Model(metaclass=ModelMeta):
         for py_name, prop in cls._properties.items():
             if prop.datastore_name in entity:
                 raw_value = entity[prop.datastore_name]
-                # noinspection PyProtectedMember
-                kwargs[py_name] = prop._from_base_type(raw_value)
 
-        return cls(key=entity.key, **kwargs)
+                if prop.repeated and isinstance(raw_value, list):
+                    # noinspection PyProtectedMember
+                    kwargs[py_name] = [prop._from_base_type(v) for v in raw_value]
+                else:
+                    # noinspection PyProtectedMember
+                    kwargs[py_name] = prop._from_base_type(raw_value)
+
+        safe_key = getattr(entity, 'key', None)
+        return cls(key=safe_key, **kwargs)
 
     @classmethod
     def _pre_get_hook(cls, key: datastore.Key) -> None:
@@ -718,8 +724,12 @@ class Model(metaclass=ModelMeta):
             value = self._values.get(py_name)
 
             if value is not None:
-                # noinspection PyProtectedMember
-                entity[prop.datastore_name] = prop._to_base_type(value)
+                if prop.repeated:
+                    # noinspection PyProtectedMember
+                    entity[prop.datastore_name] = [prop._to_base_type(v) for v in value]
+                else:
+                    # noinspection PyProtectedMember
+                    entity[prop.datastore_name] = prop._to_base_type(value)
 
         client.put(entity)
         self.key = entity.key
@@ -828,9 +838,14 @@ class Model(metaclass=ModelMeta):
                 # noinspection PyProtectedMember
                 prop._prepare_for_put(instance)
                 value = instance._values.get(py_name)
+
                 if value is not None:
-                    # noinspection PyProtectedMember
-                    entity[prop.datastore_name] = prop._to_base_type(value)
+                    if prop.repeated:
+                        # noinspection PyProtectedMember
+                        entity[prop.datastore_name] = [prop._to_base_type(v) for v in value]
+                    else:
+                        # noinspection PyProtectedMember
+                        entity[prop.datastore_name] = prop._to_base_type(value)
 
             entities_to_put.append(entity)
 

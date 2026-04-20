@@ -1,9 +1,11 @@
 import pytest
 from google.cloud import datastore
+import datetime
+from unittest.mock import patch
 
 from src.google_cloud_datastore_odm.client import get_client
 from src.google_cloud_datastore_odm.model import Model, field_validator
-from src.google_cloud_datastore_odm.properties import IntegerProperty, Property, StringProperty
+from src.google_cloud_datastore_odm.properties import IntegerProperty, Property, StringProperty, DateProperty
 
 
 class KeyTestModel(Model):
@@ -807,3 +809,71 @@ def test_put_multi_projected_entity_raises_error():
 
     with pytest.raises(RuntimeError, match="Cannot save an entity fetched via a Projection query"):
         ProjectedModel.put_multi([normal_instance, projected_instance])
+
+
+def test_model_put_repeated_property_serialization():
+    """Verify put() correctly maps serialization hooks over repeated arrays."""
+
+    class ArrayModel(Model):
+        dates = DateProperty(repeated=True)
+
+    instance = ArrayModel(dates=[datetime.date(2025, 1, 1), datetime.date(2025, 1, 2)])
+    instance_key = instance.put()
+
+    saved_entity = ArrayModel.get_by_id(instance_key.id_or_name)
+
+    assert isinstance(saved_entity['dates'][0], datetime.date)
+    assert isinstance(saved_entity['dates'][1], datetime.date)
+
+
+def test_model_put_multi_repeated_property_serialization():
+    """Verify put_multi() correctly maps serialization hooks over repeated arrays."""
+
+    class ArrayModel(Model):
+        dates = DateProperty(repeated=True)
+
+    instances = [ArrayModel(dates=[datetime.date(2025, 1, 1)])]
+    instances_keys = ArrayModel.put_multi(instances)
+
+    saved_entities = ArrayModel.get_multi(instances_keys)
+
+    assert isinstance(saved_entities[0]['dates'][0], datetime.date)
+
+
+def test_model_from_entity_repeated_property_hydration():
+    """Verify from_entity() correctly maps hydration hooks over repeated arrays."""
+
+    class ArrayModel(Model):
+        dates: list = DateProperty(repeated=True)
+
+    ds_entity = datastore.Entity()
+    ds_entity.update({
+        'dates': [
+            datetime.datetime(2025, 1, 1, tzinfo=datetime.timezone.utc),
+            datetime.datetime(2025, 1, 2, tzinfo=datetime.timezone.utc)
+        ]
+    })
+
+    instance = ArrayModel.from_entity(ds_entity)
+
+    assert isinstance(instance.dates[0], datetime.date)
+    assert isinstance(instance.dates[1], datetime.date)
+
+
+def test_model_from_entity_safe_key_missing():
+    """Verify from_entity safely handles EmbeddedEntities / dicts that lack a key attribute."""
+
+    class SimpleModel(Model):
+        name = StringProperty()
+
+    class EmbeddedEntityStub(dict):
+        pass
+
+    stub = EmbeddedEntityStub({'name': 'Alice'})
+
+    assert not hasattr(stub, 'key')
+
+    instance = SimpleModel.from_entity(stub)
+
+    assert instance.name == "Alice"
+    assert instance.key is None
