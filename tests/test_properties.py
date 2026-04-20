@@ -2,6 +2,7 @@ import datetime
 
 import pytest
 from google.cloud import datastore
+from google.cloud.datastore.helpers import GeoPoint
 
 from src.google_cloud_datastore_odm.client import get_client
 from src.google_cloud_datastore_odm.model import Model, field_validator
@@ -11,6 +12,7 @@ from src.google_cloud_datastore_odm.properties import (
     DateProperty,
     DateTimeProperty,
     FloatProperty,
+    GeoPtProperty,
     IntegerProperty,
     JsonProperty,
     KeyProperty,
@@ -847,3 +849,23 @@ def test_pickle_property():
     with pytest.raises(ValueError):
         class BadPickleModel(Model):
             state = PickleProperty(indexed=True, compressed=True)
+
+
+def test_geopt_property():
+    class GeoModel(Model):
+        location = GeoPtProperty()
+
+    instance = GeoModel()
+
+    pt1 = GeoPoint(37.7749, -122.4194)
+    instance.location = pt1
+    assert instance.location == pt1
+
+    with pytest.raises(TypeError):
+        instance.location = (37.7, -122.4)
+
+    with pytest.raises(TypeError):
+        instance.location = {"latitude": 37.7, "longitude": -122.4}
+
+    with pytest.raises(TypeError):
+        instance.location = "37.7, -122.4"

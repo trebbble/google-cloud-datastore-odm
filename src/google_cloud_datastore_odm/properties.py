@@ -13,6 +13,7 @@ import zlib
 from typing import TYPE_CHECKING, Any, Callable, List, Optional, Union
 
 from google.cloud import datastore
+from google.cloud.datastore.helpers import GeoPoint
 
 if TYPE_CHECKING:
     from .model import Model
@@ -871,3 +872,18 @@ class StructuredProperty(Property):
             value = ent
 
         return self.model_class.from_entity(value)
+
+
+class GeoPtProperty(Property):
+    """A Datastore property for storing geographical coordinates (latitude and longitude).
+
+    Accepts a native `google.cloud.datastore.helpers.GeoPoint`
+    """
+
+    def _validate_type(self, value: Any) -> Any:
+        if not isinstance(value, GeoPoint):
+            raise TypeError(
+                f"Property '{self._python_name}' requires a native "
+                f"google.cloud.datastore.helpers.GeoPoint instance. Got {type(value).__name__}."
+            )
+        return value

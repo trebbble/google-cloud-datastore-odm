@@ -10,6 +10,7 @@ import datetime
 import json
 
 from dotenv import load_dotenv
+from google.cloud.datastore.helpers import GeoPoint
 
 from src.google_cloud_datastore_odm import (
     AND,
@@ -21,6 +22,7 @@ from src.google_cloud_datastore_odm import (
     DateProperty,
     DateTimeProperty,
     FloatProperty,
+    GeoPtProperty,
     IntegerProperty,
     JsonProperty,
     KeyProperty,
@@ -786,5 +788,31 @@ print(f"Saved GameState for {state.player_id} with complex data.")
 fetched_state = GameState.get(state.key)
 print(f"Hydrated inventory data type: {type(fetched_state.inventory_data)}")
 print(f"Hydrated inventory data: {fetched_state.inventory_data}")
+
+
+# ---------------------------------------------------------------------------
+# 23. Geospatial Data (GeoPtProperty)
+# ---------------------------------------------------------------------------
+
+print("\n--- 23. Geospatial Data (GeoPtProperty) ---")
+
+
+class Landmark(Model):
+    """A model demonstrating strict native storage of geographical coordinates."""
+    name = StringProperty(required=True)
+    location = GeoPtProperty(required=True)
+
+
+eiffel = Landmark(
+    name="Eiffel Tower",
+    location=GeoPoint(48.8584, 2.2945)
+)
+eiffel.put()
+print(f"Saved {eiffel.name} at coordinates: {eiffel.location.latitude}, {eiffel.location.longitude}")
+
+fetched_landmark = Landmark.get(eiffel.key)
+print(f"Hydrated location data type: {type(fetched_landmark.location)}")
+location: GeoPoint = fetched_landmark.location
+print(f"Fetched location -> Lat:{location.latitude}, Lon:{location.longitude}")
 
 print("\nExample Run Complete!")

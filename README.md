@@ -61,7 +61,7 @@ https://trebbble.github.io/google-cloud-datastore-odm/
        - JsonProperty
     - [x] TextProperty
     - [x] StringProperty
-    - [ ] GeoPtProperty
+    - [x] GeoPtProperty
     - [x] PickleProperty
     - [x] JsonProperty
     - [x] ~~UserProperty~~ Deprecated, to be dropped.
