@@ -11,6 +11,7 @@ from .properties import JsonProperty as JsonProperty
 from .properties import KeyProperty as KeyProperty
 from .properties import Property as Property
 from .properties import StringProperty as StringProperty
+from .properties import StructuredProperty as StructuredProperty
 from .properties import TextProperty as TextProperty
 from .properties import TimeProperty as TimeProperty
 from .query import AND as AND
@@ -24,6 +25,7 @@ __all__ = [
     "field_validator",
     "model_validator",
     "Property",
+    "StructuredProperty",
     "KeyProperty",
     "BytesProperty",
     "StringProperty",

@@ -11,7 +11,7 @@ import json
 import zlib
 from typing import TYPE_CHECKING, Any, Callable, List, Optional, Union
 
-from google.cloud.datastore import Key
+from google.cloud import datastore
 
 if TYPE_CHECKING:
     from .model import Model
@@ -339,7 +339,7 @@ class KeyProperty(Property):
 
     def _validate_type(self, value: Any) -> Any:
         """Enforce that the value is a Datastore Key of the correct kind."""
-        if not isinstance(value, Key):
+        if not isinstance(value, datastore.Key):
             raise TypeError(f"Property '{self._python_name}' must be a google.cloud.datastore.Key")
 
         expected = self.expected_kind
@@ -726,3 +726,107 @@ class TimeProperty(DateTimeProperty):
     def _prepare_for_put(self, instance: "Model") -> None:
         if self.auto_now or (self.auto_now_add and getattr(instance, self._python_name) is None):
             setattr(instance, self._python_name, datetime.datetime.now(datetime.timezone.utc).time())
+
+
+class NestedPropertyProxy(Property):
+    """A proxy descriptor for querying nested properties inside a StructuredProperty.
+
+    This magically inherits all the Property query operators and perfectly
+    maps nested datastore keys (e.g. 'address.city').
+    """
+
+    def __init__(self, parent_datastore_name: str, nested_prop: Property):
+        super().__init__(name=f"{parent_datastore_name}.{nested_prop.datastore_name}")
+        self.nested_prop = nested_prop
+
+    def _to_base_type(self, value: Any) -> Any:
+        """Route the value through the nested property's Datastore hook."""
+        # noinspection PyProtectedMember
+        return self.nested_prop._to_base_type(value)
+
+
+class StructuredProperty(Property):
+    """A Datastore property that embeds another Model instance.
+
+    Maps directly to Datastore's `EmbeddedEntity` data type. Nested models are
+    fully hydrated, validated, and natively queryable using dot-notation.
+    """
+
+    def __init__(self, model_class: type["Model"], **kwargs: Any):
+        super().__init__(**kwargs)
+        self.model_class = model_class
+
+    def __getattr__(self, item: str) -> Any:
+        """
+        Intercept attribute access on the class level to build deep-query nodes!
+        Example: Article.author_info.city == "London"
+        """
+        # noinspection PyProtectedMember
+        if hasattr(self.model_class, '_properties') and item in self.model_class._properties:
+
+            if self.repeated:
+                raise ValueError(
+                    f"Datastore does not support querying sub-properties of a repeated "
+                    f"StructuredProperty ('{self.datastore_name}'). Deep queries only work on "
+                    f"singular embedded entities."
+                )
+
+            # noinspection PyProtectedMember
+            nested_prop = self.model_class._properties[item]
+            return NestedPropertyProxy(self.datastore_name, nested_prop)
+
+        raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{item}'")
+
+    def _validate_type(self, value: Any) -> Any:
+        if not isinstance(value, self.model_class):
+            raise TypeError(
+                f"Property '{self._python_name}' requires instance of {self.model_class.__name__}"
+            )
+        return value
+
+    def _to_base_type(self, value: Any) -> Any:
+        if value is None:
+            return None
+
+        # noinspection PyProtectedMember
+        value._check_completeness()
+        value.validate()
+        # noinspection PyProtectedMember
+        value._pre_put_hook()
+
+        # noinspection PyProtectedMember
+        unindexed_names = set(value._unindexed_datastore_names)
+        if not self.indexed:
+            # If the parent is unindexed, ADD all known children to the unindexed set!
+            # noinspection PyProtectedMember
+            unindexed_names.update(p.datastore_name for p in value._properties.values())
+
+        embedded_entity = datastore.Entity(exclude_from_indexes=tuple(unindexed_names))
+
+        # noinspection PyProtectedMember
+        for py_name, prop in value._properties.items():
+            # noinspection PyProtectedMember
+            prop._prepare_for_put(value)
+            # noinspection PyProtectedMember
+            val = value._values.get(py_name)
+
+            if val is not None:
+                if prop.repeated:
+                    # noinspection PyProtectedMember
+                    embedded_entity[prop.datastore_name] = [prop._to_base_type(v) for v in val]
+                else:
+                    # noinspection PyProtectedMember
+                    embedded_entity[prop.datastore_name] = prop._to_base_type(val)
+
+        return embedded_entity
+
+    def _from_base_type(self, value: Any) -> Any:
+        if value is None:
+            return None
+
+        if isinstance(value, dict) and not isinstance(value, datastore.Entity):
+            ent = datastore.Entity()
+            ent.update(value)
+            value = ent
+
+        return self.model_class.from_entity(value)

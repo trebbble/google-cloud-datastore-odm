@@ -26,6 +26,7 @@ from src.google_cloud_datastore_odm import (
     KeyProperty,
     Model,
     StringProperty,
+    StructuredProperty,
     Sum,
     TextProperty,
     TimeProperty,
@@ -726,3 +727,40 @@ for a in my_articles:
     print(f"  - {author}")
 
 print("\nExample Run Complete!")
+
+# ---------------------------------------------------------------------------
+# 21. Embedded Entities (StructuredProperty)
+# ---------------------------------------------------------------------------
+
+print("\n--- 21. Embedded Entities & Deep Nested Queries ---")
+
+
+class Address(Model):
+    """An embedded data model for our Profile."""
+    city = StringProperty()
+    country = StringProperty()
+
+
+class Profile(Model):
+    """A user profile model containing an embedded address."""
+    name = StringProperty(required=True)
+    main_location = StructuredProperty(Address)
+
+
+bob = Profile(name="Bob the Builder")
+bob.main_location = Address(city="London", country="UK")
+bob.put()
+print(f"Saved Profile: {bob.name} with nested address.")
+
+
+query = Profile.query().filter(Profile.main_location.city == "London")
+found_profile: Profile = query.get()
+
+if found_profile:
+    print(f"Deep Query found profile by city: {found_profile.name}")
+    print(f"Hydrated Address model city: {found_profile.main_location.city}")
+else:
+    print("No profile found.")
+
+print("\nExample Run Complete!")
+

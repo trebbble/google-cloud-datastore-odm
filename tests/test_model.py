@@ -1,11 +1,11 @@
+import datetime
+
 import pytest
 from google.cloud import datastore
-import datetime
-from unittest.mock import patch
 
 from src.google_cloud_datastore_odm.client import get_client
 from src.google_cloud_datastore_odm.model import Model, field_validator
-from src.google_cloud_datastore_odm.properties import IntegerProperty, Property, StringProperty, DateProperty
+from src.google_cloud_datastore_odm.properties import DateProperty, IntegerProperty, Property, StringProperty
 
 
 class KeyTestModel(Model):

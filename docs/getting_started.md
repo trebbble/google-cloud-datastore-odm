@@ -28,6 +28,7 @@ Models are defined by inheriting from the `Model` class. You map Datastore field
 import datetime
 from src.google_cloud_datastore_odm import (
     KeyProperty,
+    StructuredProperty,
     BytesProperty,
     BooleanProperty,
     DateProperty,
@@ -41,8 +42,15 @@ from src.google_cloud_datastore_odm import (
     TimeProperty,
 )
 
+class Address(Model):
+    """A nested model configuration."""
+    city = StringProperty()
+    country = StringProperty()
+
 class User(Model):
     email = StringProperty()
+    # Embed the Address model directly inside the User entity
+    home_address = StructuredProperty(Address)
 
 class Article(Model):
 
@@ -169,7 +177,10 @@ print(f"Saved with ID: {article.key.id_or_name}")
 The ODM provides familiar NDB-style methods for retrieving data.
 
 ```python
-from src.google_cloud_datastore_odm import Model, StringProperty, IntegerProperty, OR, or_, AND, and_, Count, Sum, Avg
+from src.google_cloud_datastore_odm import Model, StringProperty, IntegerProperty, StructuredProperty, OR, or_, AND, and_, Count, Sum, Avg
+
+class Address(Model):
+    city = StringProperty()
 
 class Article(Model):
     title = StringProperty(required=True)
@@ -180,13 +191,15 @@ class Article(Model):
     word_count = IntegerProperty(default=0)
     tags = StringProperty(repeated=True)
     internal_notes = StringProperty(indexed=False)
+    origin = StructuredProperty(Address)
 
 article = Article(
     id="my-first-article",
     title="Hello, World!",
     author="Alice",
     word_count=500,
-    tags=["python", "odm"]
+    tags=["python", "odm"],
+    origin=Address(city="London")
 )
 
 saved_key = article.put()
@@ -218,6 +231,12 @@ or_query = Article.query().filter(
 # Supports both PEP 8 compliant lowercase and NDB legacy uppercase
 in_query = Article.query().filter(Article.tags.in_(["python", "gcp"]))
 IN_query = Article.query().filter(Article.tags.IN(["python", "gcp"]))
+
+# Deep Nested Queries (StructuredProperty)
+# Use dot-notation to natively query inside singular embedded entities!
+# The ODM automatically translates this to 'origin.city == London'
+deep_query = Article.query().filter(Article.origin.city == "London")
+london_articles = list(deep_query.fetch())
 
 # Sorting / Ordering (Use the unary minus for descending order)
 ordered_query = Article.query().filter(Article.status == "published").order(-Article.rating, Article.title)
@@ -276,7 +295,6 @@ stats = base_query.aggregate(
     total_words=Sum(Article.word_count),
     average_words=Avg('word_count')
 )
-
 ```
 
 ## 6. Strict Equality

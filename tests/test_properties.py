@@ -16,6 +16,7 @@ from src.google_cloud_datastore_odm.properties import (
     KeyProperty,
     Property,
     StringProperty,
+    StructuredProperty,
     TextProperty,
     TimeProperty,
 )
@@ -666,3 +667,143 @@ def test_key_property_kind_class():
 
     with pytest.raises(ValueError):
         instance.target_key = client.key("WrongKind", 999)
+
+
+def test_structured_property():
+    class Address(Model):
+        city = StringProperty(required=True)
+        zip_code = IntegerProperty()
+
+    class UserModel(Model):
+        name = StringProperty()
+        home = StructuredProperty(Address)
+
+    instance = UserModel(name="Alice")
+
+    address = Address(city="London", zip_code=10001)
+    instance.home = address
+
+    assert instance.home.city == "London"
+
+    with pytest.raises(TypeError):
+        instance.home = {"city": "London"}
+
+    prop = UserModel._properties['home']
+    ds_entity = prop._to_base_type(address)
+    assert isinstance(ds_entity, datastore.Entity)
+    assert ds_entity["city"] == "London"
+
+    hydrated = prop._from_base_type(ds_entity)
+    assert isinstance(hydrated, Address)
+    assert hydrated.city == "London"
+
+    assert prop._to_base_type(None) is None
+    assert prop._from_base_type(None) is None
+
+
+def test_structured_property_unindexed_propagation():
+    """Verify that if a StructuredProperty is unindexed, it strips all inner fields from indexes."""
+
+    class Address(Model):
+        city = StringProperty(indexed=True)
+        zip_code = IntegerProperty(indexed=True)
+
+    class FastUserModel(Model):
+        home = StructuredProperty(Address, indexed=False)
+
+    prop = FastUserModel._properties['home']
+    address = Address(city="London", zip_code=10001)
+
+    ds_entity = prop._to_base_type(address)
+
+    assert "city" in ds_entity.exclude_from_indexes
+    assert "zip_code" in ds_entity.exclude_from_indexes
+
+
+def test_structured_property_nested_query_proxy():
+    """Test the __getattr__ magic that allows NDB-style dot notation deep queries."""
+
+    class DeepAddress(Model):
+        city = StringProperty(name="city_name")
+
+    class DeepUserModel(Model):
+        home = StructuredProperty(DeepAddress, name="home_info")
+
+    node = DeepUserModel.home.city == "Paris"
+
+    assert node.name == "home_info.city_name"
+    assert node.op == "="
+    assert node.value == "Paris"
+
+    with pytest.raises(AttributeError):
+        _ = DeepUserModel.home.invalid_field
+
+
+def test_structured_property_repeated_array_mapping():
+    class TagNode(Model):
+        label = StringProperty()
+
+    class ArrayUserModel(Model):
+        tags = StructuredProperty(TagNode, repeated=True)
+
+    instance = ArrayUserModel()
+
+    t1 = TagNode(label="Alpha")
+    t2 = TagNode(label="Beta")
+    instance.tags = [t1, t2]
+
+    prop = ArrayUserModel._properties['tags']
+
+    result_array = [prop._to_base_type(v) for v in instance.tags]
+
+    assert len(result_array) == 2
+    assert result_array[0]["label"] == "Alpha"
+    assert result_array[1]["label"] == "Beta"
+
+
+def test_structured_property_nested_repeated_field():
+    """Covers the line where a StructuredProperty contains a repeated property."""
+
+    class InnerModel(Model):
+        tags = StringProperty(repeated=True)
+
+    class OuterModel(Model):
+        inner = StructuredProperty(InnerModel)
+
+    prop = OuterModel._properties['inner']
+    inner_instance = InnerModel(tags=["python", "odm"])
+
+    ds_entity = prop._to_base_type(inner_instance)
+
+    assert isinstance(ds_entity, datastore.Entity)
+    assert ds_entity["tags"] == ["python", "odm"]
+
+
+def test_structured_property_from_base_type_raw_dict():
+    """Covers the line where the SDK returns a raw dict instead of an Entity."""
+
+    class InnerModel(Model):
+        name = StringProperty()
+
+    class OuterModel(Model):
+        inner = StructuredProperty(InnerModel)
+
+    prop = OuterModel._properties['inner']
+
+    raw_dict = {"name": "Alice"}
+    hydrated = prop._from_base_type(raw_dict)
+
+    assert isinstance(hydrated, InnerModel)
+    assert hydrated.name == "Alice"
+
+
+def test_structured_property_rejects_repeated_deep_query():
+    """Verify that querying sub-properties of an array raises a clear error."""
+    class Inner(Model):
+        field = StringProperty()
+
+    class Outer(Model):
+        array_prop = StructuredProperty(Inner, repeated=True)
+
+    with pytest.raises(ValueError, match="does not support querying sub-properties"):
+        _ = Outer.array_prop.field == "value"

@@ -106,12 +106,11 @@ class Query:
 
     def order(self, *args: Union[OrderNode, str, "Property"]) -> "Query":
         """Adds ordering. Accepts -Prop, Prop, or raw strings."""
-        from .properties import Property
 
         for arg in args:
             if isinstance(arg, OrderNode):
                 self._orders.append(arg)
-            elif isinstance(arg, Property):
+            elif hasattr(arg, 'datastore_name'):
                 self._orders.append(OrderNode(arg.datastore_name, False))
             elif isinstance(arg, str):
                 is_desc = arg.startswith("-")
@@ -141,13 +140,11 @@ class Query:
             _query.order = [f"{'-' if o.descending else ''}{o.name}" for o in self._orders]
 
         if self._projection:
-            from .properties import Property
-            mapped_proj = [p.datastore_name if isinstance(p, Property) else p for p in self._projection]
+            mapped_proj = [getattr(p, 'datastore_name', p) for p in self._projection]
             _query.projection = mapped_proj
 
         if self._distinct_on:
-            from .properties import Property
-            mapped_distinct = [d.datastore_name if isinstance(d, Property) else d for d in self._distinct_on]
+            mapped_distinct = [getattr(d, 'datastore_name', d) for d in self._distinct_on]
             _query.distinct_on = mapped_distinct
 
         if self._keys_only:
@@ -166,9 +163,10 @@ class Query:
             return entity.key
         return self.model_cls.from_entity(entity, _is_projected=is_projected)
 
-    def fetch(self,limit: Optional[int] = None) -> Generator[Union["Model", Any], None, None]:
+    def fetch(self, limit: Optional[int] = None) -> Generator[Union["Model", Any], None, None]:
         """Yields hydrated Model instances (or Keys) from the Datastore."""
         native_query = self._build()
+
         is_projected = bool(self._projection)
 
         for entity in native_query.fetch(limit=limit):
@@ -228,8 +226,7 @@ class Query:
 
     def sum(self, property_field: Union[str, "Property"]) -> Union[int, float]:
         """Performs a fast server-side sum aggregation on a specific property."""
-        from .properties import Property
-        prop_name = property_field.datastore_name if isinstance(property_field, Property) else property_field
+        prop_name = getattr(property_field, 'datastore_name', property_field)
 
         client = get_client(self.project, self.database)
         agg_query = client.aggregation_query(self._build())
@@ -240,8 +237,7 @@ class Query:
 
     def avg(self, property_field: Union[str, "Property"]) -> float:
         """Performs a fast server-side average aggregation on a specific property."""
-        from .properties import Property
-        prop_name = property_field.datastore_name if isinstance(property_field, Property) else property_field
+        prop_name = getattr(property_field, 'datastore_name', property_field)
 
         client = get_client(self.project, self.database)
         agg_query = client.aggregation_query(self._build())
@@ -272,8 +268,7 @@ class Query:
                 )
 
             if isinstance(agg_obj, (Sum, Avg)):
-                from .properties import Property
-                if isinstance(agg_obj.property_ref, Property):
+                if hasattr(agg_obj.property_ref, 'datastore_name'):
                     agg_obj.property_ref = agg_obj.property_ref.datastore_name
 
             agg_obj.alias = alias

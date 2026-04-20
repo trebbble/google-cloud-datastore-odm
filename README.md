@@ -70,8 +70,8 @@ https://trebbble.github.io/google-cloud-datastore-odm/
     - [x] DateTimeProperty
     - [x] DateProperty
     - [x] TimeProperty
-    - [ ] StructuredProperty
-    - [x] ~~LocalStructuredProperty~~ To be dropped. If structured and indexed is needed one can use StructuredProperty. If structured but not indexexed is needed, then they can use JsonProperty
+    - [x] StructuredProperty
+    - [x] ~~LocalStructuredProperty~~ To be dropped. StructuredProperty and JsonProperty can accomodate sufficiently.
     - [ ] GenericProperty
     - [ ] ComputedProperty
   - [ ] Polymodel Support
