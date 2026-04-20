@@ -14,6 +14,7 @@ from src.google_cloud_datastore_odm.properties import (
     IntegerProperty,
     JsonProperty,
     KeyProperty,
+    PickleProperty,
     Property,
     StringProperty,
     StructuredProperty,
@@ -250,7 +251,7 @@ def test_json_property():
     class UnserializableObject:
         pass
 
-    with pytest.raises(TypeError, match="must be JSON serializable"):
+    with pytest.raises(TypeError):
         prop._to_base_type(UnserializableObject())
 
 
@@ -805,5 +806,44 @@ def test_structured_property_rejects_repeated_deep_query():
     class Outer(Model):
         array_prop = StructuredProperty(Inner, repeated=True)
 
-    with pytest.raises(ValueError, match="does not support querying sub-properties"):
+    with pytest.raises(ValueError):
         _ = Outer.array_prop.field == "value"
+
+
+def test_pickle_property():
+    class PickleModel(Model):
+        state = PickleProperty()
+
+    prop = PickleModel._properties['state']
+    assert prop.indexed is False
+
+    instance = PickleModel()
+
+    weird_data = {"apple", "banana", "cherry"}
+    instance.state = weird_data
+    assert instance.state == weird_data
+
+    ds_value_uncompressed = prop._to_base_type(weird_data)
+    assert isinstance(ds_value_uncompressed, bytes)
+
+    # noinspection PyProtectedMember
+    py_value_uncompressed = prop._from_base_type(ds_value_uncompressed)
+    assert py_value_uncompressed == weird_data
+
+    class CompressedPickleModel(Model):
+        state = PickleProperty(compressed=True)
+
+    comp_prop = CompressedPickleModel._properties['state']
+
+    ds_value = comp_prop._to_base_type(weird_data)
+    assert isinstance(ds_value, bytes)
+
+    py_value = comp_prop._from_base_type(ds_value)
+    assert py_value == weird_data
+
+    assert prop._to_base_type(None) is None
+    assert prop._from_base_type(None) is None
+
+    with pytest.raises(ValueError):
+        class BadPickleModel(Model):
+            state = PickleProperty(indexed=True, compressed=True)

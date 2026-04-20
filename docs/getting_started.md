@@ -29,6 +29,7 @@ import datetime
 from src.google_cloud_datastore_odm import (
     KeyProperty,
     StructuredProperty,
+    PickleProperty,
     BytesProperty,
     BooleanProperty,
     DateProperty,
@@ -77,6 +78,8 @@ class Article(Model):
     metadata: dict | list = JsonProperty()
     # Automatically unindexed, optionally compressed
     attachment_raw = BytesProperty(compressed=True)
+    # Store arbitrary non-JSON serializable python objects (like sets), Automatically unindexed, optionally compressed
+    legacy_session_data = PickleProperty(compressed=True)
 ```
 ## 3. Validation
 

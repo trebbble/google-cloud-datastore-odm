@@ -8,6 +8,7 @@ validation, default values, and Datastore schema mapping.
 
 import datetime
 import json
+import pickle
 import zlib
 from typing import TYPE_CHECKING, Any, Callable, List, Optional, Union
 
@@ -390,6 +391,46 @@ class BytesProperty(Property):
         if self.compressed and isinstance(value, bytes):
             return zlib.decompress(value)
         return value
+
+
+class PickleProperty(Property):
+    """A Datastore property for storing arbitrary Python objects.
+
+    Uses Python's built-in `pickle` module to serialize objects into bytes.
+    It is by default unindexed to bypass Datastore's 1500-byte limit.
+
+    WARNING: The `pickle` module is not secure. Only unpickle data you trust.
+    For standard data structures, `JsonProperty` is highly recommended instead.
+    """
+
+    def __init__(self, compressed: bool = False, **kwargs: Any):
+        kwargs.setdefault("indexed", False)
+
+        if compressed and kwargs.get("indexed"):
+            raise ValueError("A PickleProperty cannot be both compressed and indexed.")
+
+        kwargs["indexed"] = False
+        super().__init__(**kwargs)
+        self.compressed = compressed
+
+    def _to_base_type(self, value: Any) -> Any:
+        if value is None:
+            return None
+
+        pickled_data = pickle.dumps(value)
+
+        if self.compressed:
+            return zlib.compress(pickled_data)
+        return pickled_data
+
+    def _from_base_type(self, value: Any) -> Any:
+        if value is None:
+            return None
+
+        if self.compressed and isinstance(value, bytes):
+            value = zlib.decompress(value)
+
+        return pickle.loads(value)
 
 
 class StringProperty(Property):

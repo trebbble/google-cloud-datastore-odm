@@ -25,6 +25,7 @@ from src.google_cloud_datastore_odm import (
     JsonProperty,
     KeyProperty,
     Model,
+    PickleProperty,
     StringProperty,
     StructuredProperty,
     Sum,
@@ -742,7 +743,6 @@ class Address(Model):
 
 
 class Profile(Model):
-    """A user profile model containing an embedded address."""
     name = StringProperty(required=True)
     main_location = StructuredProperty(Address)
 
@@ -754,7 +754,7 @@ print(f"Saved Profile: {bob.name} with nested address.")
 
 
 query = Profile.query().filter(Profile.main_location.city == "London")
-found_profile: Profile = query.get()
+found_profile = query.get()
 
 if found_profile:
     print(f"Deep Query found profile by city: {found_profile.name}")
@@ -762,5 +762,29 @@ if found_profile:
 else:
     print("No profile found.")
 
-print("\nExample Run Complete!")
 
+# ---------------------------------------------------------------------------
+# 22. Arbitrary Python Objects (PickleProperty)
+# ---------------------------------------------------------------------------
+
+print("\n--- 22. Arbitrary Python Objects (PickleProperty) ---")
+
+
+class GameState(Model):
+    """A model demonstrating storage of non-JSON serializable objects."""
+    player_id = StringProperty(required=True)
+    inventory_data = PickleProperty(compressed=True)
+
+
+complex_data = {"sword", "shield", "potion"}
+
+state = GameState(player_id="player-1")
+state.inventory_data = complex_data
+state.put()
+print(f"Saved GameState for {state.player_id} with complex data.")
+
+fetched_state = GameState.get(state.key)
+print(f"Hydrated inventory data type: {type(fetched_state.inventory_data)}")
+print(f"Hydrated inventory data: {fetched_state.inventory_data}")
+
+print("\nExample Run Complete!")

@@ -9,6 +9,7 @@ from .properties import FloatProperty as FloatProperty
 from .properties import IntegerProperty as IntegerProperty
 from .properties import JsonProperty as JsonProperty
 from .properties import KeyProperty as KeyProperty
+from .properties import PickleProperty as PickleProperty
 from .properties import Property as Property
 from .properties import StringProperty as StringProperty
 from .properties import StructuredProperty as StructuredProperty
@@ -27,6 +28,7 @@ __all__ = [
     "Property",
     "StructuredProperty",
     "KeyProperty",
+    "PickleProperty",
     "BytesProperty",
     "StringProperty",
     "TextProperty",
