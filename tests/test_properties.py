@@ -12,6 +12,7 @@ from src.google_cloud_datastore_odm.properties import (
     DateProperty,
     DateTimeProperty,
     FloatProperty,
+    GenericProperty,
     GeoPtProperty,
     IntegerProperty,
     JsonProperty,
@@ -869,3 +870,56 @@ def test_geopt_property():
 
     with pytest.raises(TypeError):
         instance.location = "37.7, -122.4"
+
+
+def test_generic_property():
+    class DynamicModel(Model):
+        payload = GenericProperty()
+
+    instance = DynamicModel()
+    prop = DynamicModel._properties['payload']
+
+    instance.payload = "Hello"
+    assert instance.payload == "Hello"
+
+    instance.payload = 42
+    assert instance.payload == 42
+
+    complex_dict = {"nested": [1, 2, 3], "flag": True}
+    instance.payload = complex_dict
+
+    from google.cloud.datastore import Entity
+    mock_sdk_return = Entity()
+    mock_sdk_return.update(complex_dict)
+
+    hydrated = prop._from_base_type(mock_sdk_return)
+    assert hydrated == complex_dict
+    assert type(hydrated) is dict
+
+    assert prop._to_base_type(None) is None
+    assert prop._from_base_type(None) is None
+
+    uncompressed_bytes = b"just some raw bytes"
+    assert prop._to_base_type(uncompressed_bytes) == uncompressed_bytes
+    assert prop._from_base_type(uncompressed_bytes) == uncompressed_bytes
+
+    class CompressedDynamicModel(Model):
+        payload = GenericProperty(compressed=True)
+
+    comp_prop = CompressedDynamicModel._properties['payload']
+    assert comp_prop.indexed is False
+
+    raw_bytes = b"hello world bytes data"
+    ds_bytes = comp_prop._to_base_type(raw_bytes)
+    assert ds_bytes != raw_bytes
+
+    hydrated_bytes = comp_prop._from_base_type(ds_bytes)
+    assert hydrated_bytes == raw_bytes
+
+    raw_str = "hello text data"
+    ds_str = comp_prop._to_base_type(raw_str)
+    assert ds_str == raw_str
+
+    with pytest.raises(ValueError):
+        class BadDynamicModel(Model):
+            payload = GenericProperty(indexed=True, compressed=True)

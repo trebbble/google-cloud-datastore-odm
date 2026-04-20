@@ -41,7 +41,8 @@ from src.google_cloud_datastore_odm import (
     StringProperty,
     TextProperty,
     TimeProperty,
-    GeoPtProperty
+    GeoPtProperty,
+    GenericProperty
 )
 
 class Address(Model):
@@ -81,7 +82,10 @@ class Article(Model):
     attachment_raw = BytesProperty(compressed=True)
     # Store arbitrary non-JSON serializable python objects (like sets), Automatically unindexed, optionally compressed
     legacy_session_data = PickleProperty(compressed=True)
+    # store native datastore GeoPoint objects
     location = GeoPtProperty()
+    # store any native datatype and optionally compress in case of bytes
+    schemaless_log = GenericProperty(compressed=True)
 ```
 ## 3. Validation
 

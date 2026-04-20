@@ -22,6 +22,7 @@ from src.google_cloud_datastore_odm import (
     DateProperty,
     DateTimeProperty,
     FloatProperty,
+    GenericProperty,
     GeoPtProperty,
     IntegerProperty,
     JsonProperty,
@@ -814,5 +815,32 @@ fetched_landmark = Landmark.get(eiffel.key)
 print(f"Hydrated location data type: {type(fetched_landmark.location)}")
 location: GeoPoint = fetched_landmark.location
 print(f"Fetched location -> Lat:{location.latitude}, Lon:{location.longitude}")
+
+print("\n--- 24. Schema-less Data (GenericProperty) ---")
+
+
+class EventLog(Model):
+    """A model demonstrating dynamic schema-less storage."""
+    event_name = StringProperty(required=True)
+    payload = GenericProperty()
+
+
+log1 = EventLog(event_name="login", payload="User logged in via Web.")
+log1.put()
+
+log2 = EventLog(event_name="purchase", payload=99)
+log2.put()
+
+log3 = EventLog(event_name="system_crash", payload={
+    "error_code": 500,
+    "affected_services": ["auth", "database"],
+    "resolved": False
+})
+log3.put()
+
+print("Saved logs with varying payload types.")
+for key in [log1.key, log2.key, log3.key]:
+    fetched = EventLog.get(key)
+    print(f"Fetched {fetched.event_name} -> Payload Type: {type(fetched.payload).__name__} -> {fetched.payload}")
 
 print("\nExample Run Complete!")

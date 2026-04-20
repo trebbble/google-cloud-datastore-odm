@@ -887,3 +887,49 @@ class GeoPtProperty(Property):
                 f"google.cloud.datastore.helpers.GeoPoint instance. Got {type(value).__name__}."
             )
         return value
+
+
+class GenericProperty(Property):
+    """A Datastore property that can store any natively supported type dynamically.
+
+    Acts as a schema-less field allowing you to store strings, integers, floats,
+    booleans, datetimes, lists, or dictionaries without strict type enforcement.
+
+    Supports `compressed=True`, which is only effective for `bytes` values and
+    forces `indexed=False`.
+    """
+
+    def __init__(self, compressed: bool = False, **kwargs: Any):
+        kwargs.setdefault("indexed", not compressed)
+
+        if compressed and kwargs.get("indexed"):
+            raise ValueError(
+                "A GenericProperty cannot be compressed and indexed at the same time."
+            )
+
+        super().__init__(**kwargs)
+        self.compressed = compressed
+
+    def _to_base_type(self, value: Any) -> Any:
+        if value is None:
+            return None
+
+        if self.compressed and isinstance(value, bytes):
+            return zlib.compress(value)
+
+        return value
+
+    def _from_base_type(self, value: Any) -> Any:
+        if value is None:
+            return None
+
+        if self.compressed and isinstance(value, bytes):
+            return zlib.decompress(value)
+
+        # If the developer saved a dictionary, the Google SDK sometimes returns
+        # it wrapped in a `datastore.Entity` object. We cast it back to a pure
+        # Python dict so the developer gets back exactly what they put in.
+        if value.__class__.__name__ == 'Entity':
+            return dict(value)
+
+        return value

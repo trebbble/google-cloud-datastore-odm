@@ -6,6 +6,7 @@ from .properties import BytesProperty as BytesProperty
 from .properties import DateProperty as DateProperty
 from .properties import DateTimeProperty as DateTimeProperty
 from .properties import FloatProperty as FloatProperty
+from .properties import GenericProperty as GenericProperty
 from .properties import GeoPtProperty as GeoPtProperty
 from .properties import IntegerProperty as IntegerProperty
 from .properties import JsonProperty as JsonProperty
@@ -41,6 +42,7 @@ __all__ = [
     "DateProperty",
     "TimeProperty",
     "GeoPtProperty",
+    "GenericProperty",
     "and_",
     "AND",
     "or_",
