@@ -1,5 +1,5 @@
 name: 🐛 Bug Report
-description: Create a report to help us improve the ODM
+description: Create a report to help us improve the google-cloud-datastore-odm
 title: "bug: <short description>"
 labels: ["bug"]
 body:

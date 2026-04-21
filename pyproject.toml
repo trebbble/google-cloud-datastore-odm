@@ -5,7 +5,7 @@ build-backend = "uv_build"
 [project]
 name = "google-cloud-datastore-odm"
 version = "0.1.0"
-description = "Minimal ORM for Google Cloud Datastore inspired by NDB"
+description = "A modern, fully-typed Python ODM for Google Cloud Datastore."
 readme = "README.md"
 requires-python = "==3.14.*"
 dependencies = [

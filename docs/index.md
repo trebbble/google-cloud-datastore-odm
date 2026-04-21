@@ -1,8 +1,10 @@
 # Google Cloud Datastore ODM
 
-**A modern, strictly-typed, NDB-inspired Object-Document Mapper for Google Cloud Datastore.**
+**A modern, fully-typed, Object Document Mapper for Google Cloud Datastore.**
 
 Built for modern Python, this ODM bridges the gap between the raw `google-cloud-datastore` client and the developer-friendly ergonomics of the legacy App Engine NDB library.
+
+It features a declarative property system, intuitive AST-based query building, and intelligent, context-aware ACID transactions with automatic concurrency retries.
 
 ## Key Features
 
