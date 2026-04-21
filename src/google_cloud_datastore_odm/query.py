@@ -7,10 +7,10 @@ This module is structured into three layers:
 3. Query Engine: The main class that translates Nodes into Datastore SDK calls.
 """
 
-from typing import TYPE_CHECKING, Any, Dict, Generator, List, Optional, Union
-import warnings
 import inspect
 import os
+import warnings
+from typing import TYPE_CHECKING, Any, Dict, Generator, List, Optional, Union
 
 from google.cloud.datastore import query
 from google.cloud.datastore.aggregation import AvgAggregation as Avg

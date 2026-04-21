@@ -1,6 +1,6 @@
+import warnings
 from unittest.mock import MagicMock, patch
 
-import warnings
 import pytest
 from google.cloud.datastore import Key, query
 from google.cloud.datastore.aggregation import AggregationQuery
@@ -467,23 +467,23 @@ def test_query_unindexed_warnings():
         body = StringProperty(indexed=False)
 
     q_filter = SearchModel.query().filter(SearchModel.body == "hello")
-    with pytest.warns(UserWarning) as e:
+    with pytest.warns(UserWarning):
         q_filter._build()
 
     q_order = SearchModel.query().order("-body")
-    with pytest.warns(UserWarning) as e:
+    with pytest.warns(UserWarning):
         q_order._build()
 
     q_proj = SearchModel.query().projection(SearchModel.body)
-    with pytest.warns(UserWarning) as e:
+    with pytest.warns(UserWarning):
         q_proj._build()
 
     q_composite = SearchModel.query().filter(OR(SearchModel.title == "A", SearchModel.body == "B"))
-    with pytest.warns(UserWarning) as e:
+    with pytest.warns(UserWarning):
         q_composite._build()
 
     q_safe = SearchModel.query().filter(SearchModel.title == "Safe").order("-title").projection("title")
-    with warnings.catch_warnings() as e:
+    with warnings.catch_warnings():
         warnings.simplefilter("error")
         q_safe._build()
 
