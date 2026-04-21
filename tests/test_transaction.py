@@ -4,8 +4,8 @@ import pytest
 from google.api_core.exceptions import Aborted
 from google.cloud import datastore
 
-from src.google_cloud_datastore_odm import IntegerProperty, Model, StringProperty, transaction, transactional
-from src.google_cloud_datastore_odm.transaction import get_current_transaction
+from google_cloud_datastore_odm import IntegerProperty, Model, StringProperty, transaction, transactional
+from google_cloud_datastore_odm.transaction import get_current_transaction
 from tests.conftest import QueryTestModel
 
 
@@ -99,6 +99,7 @@ def test_transaction_batch_routing(reset_datastore):
 def test_transactional_generator_ban():
     """Ensure the decorator actively refuses to wrap generator functions."""
     with pytest.raises(TypeError):
+
         @transactional()
         def bad_generator_txn():
             yield 1
@@ -176,10 +177,7 @@ def test_transaction_routing_arguments():
     """Ensure the transaction context manager correctly passes routing args to the Client."""
 
     with transaction(project="test-proj", database="test-db"):
-        log = AuditLog(
-            action="Transfer: Alice to Bob",
-            amount=30
-        )
+        log = AuditLog(action="Transfer: Alice to Bob", amount=30)
         log.put()
 
     default_logs = list(AuditLog.query().fetch())
@@ -197,7 +195,7 @@ def test_transaction_namespace_isolation(reset_datastore):
         r2 = RoutedModel(name="Secret 2")
         RoutedModel.put_multi([r1, r2])
 
-    default_results = list(RoutedModel.query(namespace='default').fetch())
+    default_results = list(RoutedModel.query(namespace="default").fetch())
     assert len(default_results) == 0
 
     secure_results = list(RoutedModel.query(namespace="secure-ns").fetch())

@@ -7,29 +7,57 @@ https://trebbble.github.io/google-cloud-datastore-odm/
 
 ---
 
-### Dependencies
-- `uv sync all-groups`
+### Local Setup & Dependencies
+The project uses [`uv`](https://github.com/astral-sh/uv) for lightning-fast dependency management.
+```bash
+# Install the package in editable mode along with all dev dependencies
+uv sync
+```
 
 ### Local emulators
-- `docker compose -f docker-compose.yml up -d --build`
-- `docker compose -f docker-compose.yml down --volumes`
 
-### Local usage
-- Datastore emulator for dev:
-    - `DATASTORE_EMULATOR_HOST=localhost:10000`
-    - `GOOGLE_CLOUD_PROJECT=google-cloud-datastore-odm-dev`
-- Datastore emulator for tests:
-    - `DATASTORE_EMULATOR_HOST=localhost:10001`
-    - `GOOGLE_CLOUD_PROJECT=google-cloud-datastore-odm-test`
-- Datastore emulator UI : `localhost:10002`
+```bash
+# Start all emulators in the background
+docker compose -f docker-compose.yml up -d --build
+
+# Tear down and wipe data
+docker compose -f docker-compose.yml down --volumes
+```
+
+- Environment variables to connect to emulators
+  - Datastore dev emulator:
+    ```bash
+    DATASTORE_EMULATOR_HOST=localhost:10000
+    GOOGLE_CLOUD_PROJECT=google-cloud-datastore-odm-dev
+    ```
+
+  - Datastore tests emulator:
+    ```bash
+    DATASTORE_EMULATOR_HOST=localhost:10001
+    GOOGLE_CLOUD_PROJECT=google-cloud-datastore-odm-test
+    ```
+
+- Datastore emulator user interface at `localhost:10002`
 
 
-### Local tests & Coverage:
-  - From root folder `docker compose -f docker-compose.yml up -d --build datastore-test`
-  - `uv run pytest` or `python3.14 -m pytest` 
-  - To run with coverage and generate an XML report: `uv run pytest --cov=src --cov-report=xml --cov-report=term-missing`
-  - To generate the local coverage badge (requires the XML report): `uv run genbadge coverage -i coverage.xml -o coverage.svg`
-- Run linter `uv run ruff check`
+### Testing & Linting
+
+
+```bash
+# Start all emulators in the background
+docker compose -f docker-compose.yml up -d --build
+# or start only datastore container dedicated for testing
+docker compose -f docker-compose.yml up -d --build datastore-test
+
+uv run pytest 
+# Run tests with coverage and generate an XML report
+uv run pytest --cov=google_cloud_datastore_odm --cov-report=xml --cov-report=term-missing
+# Generate the local coverage badge
+uv run genbadge coverage -i coverage.xml -o coverage.svg
+
+# Run the linter & formatter
+uv run ruff check
+```
 
 
 ### Local docs:

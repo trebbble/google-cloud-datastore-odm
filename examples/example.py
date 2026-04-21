@@ -12,7 +12,7 @@ import json
 from dotenv import load_dotenv
 from google.cloud.datastore.helpers import GeoPoint
 
-from src.google_cloud_datastore_odm import (
+from google_cloud_datastore_odm import (
     AND,
     OR,
     Avg,
@@ -56,8 +56,10 @@ load_dotenv()
 #    - name: Maps the Python attribute to a legacy/different Datastore column name.
 # ---------------------------------------------------------------------------
 
+
 class Author(Model):
     """A standalone Author model to demonstrate relational data."""
+
     name = StringProperty(required=True)
     email = StringProperty()
 
@@ -104,13 +106,13 @@ class Article(Model):
     #    - Run automatically during property assignment.
     # -----------------------------------------------------------------------
 
-    @field_validator('title')
+    @field_validator("title")
     def validate_title(self, value: str) -> str:
         if len(value) < 3 or len(value) > 200:
             raise ValueError("Title must be between 3 and 200 characters.")
         return value
 
-    @field_validator('word_count')
+    @field_validator("word_count")
     def validate_word_count(self, value: int) -> int:
         if value < 0:
             raise ValueError("Word count cannot be negative.")
@@ -134,6 +136,7 @@ class Article(Model):
 #    - Passed as a list to Property(validators=[...]).
 #    - Run *before* the @field_validators.
 # ---------------------------------------------------------------------------
+
 
 def no_emoji_allowed(value: str) -> str:
     for char in value:
@@ -167,17 +170,14 @@ except ValueError as e:
 
 class LegacyDataModel(Model):
     # This maps the Python attribute `legacy_key` to the Datastore column `key`.
-    legacy_key = StringProperty(name='key')
+    legacy_key = StringProperty(name="key")
     id = StringProperty()
     parent = StringProperty()
 
 
 parent_key = LegacyDataModel.key_from_id("parent-1")
 legacy_instance = LegacyDataModel(
-    _id="datastore-key-123", _parent=parent_key,
-    legacy_key="some-key",
-    id="my_custom_id",
-    parent="my_custom_parent"
+    _id="datastore-key-123", _parent=parent_key, legacy_key="some-key", id="my_custom_id", parent="my_custom_parent"
 )
 legacy_instance.put()
 print(f"Mapped Legacy Instance: Key ID = {legacy_instance.key.name}, Parent = {legacy_instance.key.parent}")
@@ -197,13 +197,13 @@ article = Article(
     word_count=500,
     is_featured=True,
     score=98.5,
-    attachment_raw=b'some raw bytes data',
+    attachment_raw=b"some raw bytes data",
     publish_date=datetime.date.today(),
     publish_time=datetime.datetime.now(datetime.timezone.utc).time(),
     tags=["python", "odm"],
     internal_notes="Review again tomorrow.",
     body="This is a very large block of text that won't blow up our indexes.",
-    metadata={"views": 0, "platforms": ["web", "mobile"]}
+    metadata={"views": 0, "platforms": ["web", "mobile"]},
 )
 print(f"Created: {article}")
 print(f"Has key: {article.key is not None}")
@@ -220,7 +220,7 @@ print(f"Created comment: {comment}")
 print("\n--- Dict-style and Iteration ---")
 print(f"article['title'] = {article['title']}")
 
-article['status'] = "published"
+article["status"] = "published"
 print(f"After dict-style set, status: {article.status}")
 
 print("Iterating over keys:", list(article))
@@ -437,27 +437,25 @@ class SystemLog(Model):
 
 log_default = SystemLog(event="Startup", user_id="system")
 log_default.put()
-print(f"Saved default log: "
-      f"project={log_default.key.project}, "
-      f"database={log_default.key.database}, "
-      f"namespace={log_default.key.namespace}, "
-      f"kind={log_default.key.kind}")
+print(
+    f"Saved default log: "
+    f"project={log_default.key.project}, "
+    f"database={log_default.key.database}, "
+    f"namespace={log_default.key.namespace}, "
+    f"kind={log_default.key.kind}"
+)
 print(log_default)
 
 
-log_tenant = SystemLog(
-    event="Login",
-    user_id="alicia",
-    project="customer-project-123",
-    database="db-2",
-    namespace="tenant-b"
-)
+log_tenant = SystemLog(event="Login", user_id="alicia", project="customer-project-123", database="db-2", namespace="tenant-b")
 log_tenant.put()
-print(f"Saved ad-hoc log: "
-      f"project={log_tenant.key.project}, "
-      f"database={log_tenant.key.database}, "
-      f"namespace={log_tenant.key.namespace}, "
-      f"kind={log_tenant.key.kind}")
+print(
+    f"Saved ad-hoc log: "
+    f"project={log_tenant.key.project}, "
+    f"database={log_tenant.key.database}, "
+    f"namespace={log_tenant.key.namespace}, "
+    f"kind={log_tenant.key.kind}"
+)
 print(log_tenant)
 
 central_logs = list(SystemLog.query().filter("event", "=", "Startup").fetch())
@@ -465,7 +463,7 @@ central_logs = list(SystemLog.query().filter("event", "=", "Startup").fetch())
 print(f"Found {len(central_logs)} startup logs in the central project.")
 
 customer_logs = list(
-    SystemLog.query(project="customer-project-123", database='db-2', namespace="tenant-b")
+    SystemLog.query(project="customer-project-123", database="db-2", namespace="tenant-b")
     .filter("user_id", "=", "alicia")
     .fetch()
 )
@@ -481,16 +479,37 @@ print("\n--- 19. Advanced NDB-Style Queries ---")
 # Seed specific data for testing our advanced operators
 print("Seeding data for advanced queries...")
 adv_articles = [
-    Article(id="adv1", title="Python 101", author="Alice", status="published", word_count=500,
-            tags=["python", "beginner"], score=4.9),
-    Article(id="adv2", title="GCP Masterclass", author="Bob", status="published", word_count=3500,
-            tags=["gcp", "advanced"], score=4.9),
-    Article(id="adv3", title="Draft Notes", author="Alice", status="draft", word_count=150,
-            tags=["notes"], score=0.0),
-    Article(id="adv4", title="Datastore Deep Dive", author="Charlie", status="published", word_count=5000,
-            tags=["gcp", "datastore"], score=5.0),
-    Article(id="adv5", title="Old Archived Post", author="Bob", status="archived", word_count=1200,
-            tags=["legacy"], score=3.2),
+    Article(
+        id="adv1",
+        title="Python 101",
+        author="Alice",
+        status="published",
+        word_count=500,
+        tags=["python", "beginner"],
+        score=4.9,
+    ),
+    Article(
+        id="adv2",
+        title="GCP Masterclass",
+        author="Bob",
+        status="published",
+        word_count=3500,
+        tags=["gcp", "advanced"],
+        score=4.9,
+    ),
+    Article(id="adv3", title="Draft Notes", author="Alice", status="draft", word_count=150, tags=["notes"], score=0.0),
+    Article(
+        id="adv4",
+        title="Datastore Deep Dive",
+        author="Charlie",
+        status="published",
+        word_count=5000,
+        tags=["gcp", "datastore"],
+        score=5.0,
+    ),
+    Article(
+        id="adv5", title="Old Archived Post", author="Bob", status="archived", word_count=1200, tags=["legacy"], score=3.2
+    ),
 ]
 Article.put_multi(adv_articles)
 
@@ -575,9 +594,7 @@ for art in q_c5.fetch():
 print("\nScenario D: Bitwise Logical Operators (&, |)")
 print("  [Log] Using Python bitwise operators for clean syntax:")
 # Note: Python requires parenthesis around conditions when using bitwise operators!
-q_d = Article.query().filter(
-    ((Article.author == "Alice") & (Article.status == "draft")) | (Article.score >= 4.9)
-)
+q_d = Article.query().filter(((Article.author == "Alice") & (Article.status == "draft")) | (Article.score >= 4.9))
 for art in q_d.fetch():
     print(f"    -> {art.title} (Author: {art.author}, Status: {art.status}, Score: {art.score})")
 
@@ -612,11 +629,7 @@ print(f"Total Words Written: {total_words}")
 print(f"Average Words per Article: {average_words:.1f}")
 
 print("\n--- Batch Aggregations ---")
-stats = base_query.aggregate(
-    total_articles=Count(),
-    total_words=Sum(Article.word_count),
-    average_words=Avg('word_count')
-)
+stats = base_query.aggregate(total_articles=Count(), total_words=Sum(Article.word_count), average_words=Avg("word_count"))
 
 print(f"Total Published Articles: {stats['total_articles']}")
 print(f"Total Words Written: {stats['total_words']}")
@@ -681,7 +694,7 @@ except AttributeError as e:
 # ---------------------------------------------------------
 # Projection & Distinct
 # ---------------------------------------------------------
-unique_authors = list(Article.query().projection(Article.author, 'title').distinct_on(Article.author).fetch())
+unique_authors = list(Article.query().projection(Article.author, "title").distinct_on(Article.author).fetch())
 print(f"\nUnique authors with titles: {len(unique_authors)} found")
 for r in unique_authors:
     r: Article
@@ -698,12 +711,7 @@ print(f"\nFound {len(all_keys)} keys")
 # ---------------------------------------------------------
 print("\n--- Pagination / Cursors ---")
 
-query = (
-    Article.query()
-    .order(Article.author)
-    .projection(Article.author, Article.title)
-    .distinct_on(Article.author)
-)
+query = Article.query().order(Article.author).projection(Article.author, Article.title).distinct_on(Article.author)
 
 cursor = None
 has_more = True
@@ -730,7 +738,7 @@ relational_article = Article(
     author="Alice Writer",
     author_key=alice_writer.key,
     status="published",
-    word_count=1200
+    word_count=1200,
 )
 relational_article.put()
 print(f"Saved Article! Linked to Author Key: {relational_article.author_key}")
@@ -751,6 +759,7 @@ print("\n--- 21. Embedded Entities & Deep Nested Queries ---")
 
 class Address(Model):
     """An embedded data model for our Profile."""
+
     city = StringProperty()
     country = StringProperty()
 
@@ -785,6 +794,7 @@ print("\n--- 22. Arbitrary Python Objects (PickleProperty) ---")
 
 class GameState(Model):
     """A model demonstrating storage of non-JSON serializable objects."""
+
     player_id = StringProperty(required=True)
     inventory_data = PickleProperty(compressed=True)
 
@@ -810,14 +820,12 @@ print("\n--- 23. Geospatial Data (GeoPtProperty) ---")
 
 class Landmark(Model):
     """A model demonstrating strict native storage of geographical coordinates."""
+
     name = StringProperty(required=True)
     location = GeoPtProperty(required=True)
 
 
-eiffel = Landmark(
-    name="Eiffel Tower",
-    location=GeoPoint(48.8584, 2.2945)
-)
+eiffel = Landmark(name="Eiffel Tower", location=GeoPoint(48.8584, 2.2945))
 eiffel.put()
 print(f"Saved {eiffel.name} at coordinates: {eiffel.location.latitude}, {eiffel.location.longitude}")
 
@@ -831,6 +839,7 @@ print("\n--- 24. Schema-less Data (GenericProperty) ---")
 
 class EventLog(Model):
     """A model demonstrating dynamic schema-less storage."""
+
     event_name = StringProperty(required=True)
     payload = GenericProperty()
 
@@ -841,11 +850,9 @@ log1.put()
 log2 = EventLog(event_name="purchase", payload=99)
 log2.put()
 
-log3 = EventLog(event_name="system_crash", payload={
-    "error_code": 500,
-    "affected_services": ["auth", "database"],
-    "resolved": False
-})
+log3 = EventLog(
+    event_name="system_crash", payload={"error_code": 500, "affected_services": ["auth", "database"], "resolved": False}
+)
 log3.put()
 
 print("Saved logs with varying payload types.")

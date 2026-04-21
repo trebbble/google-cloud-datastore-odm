@@ -3,9 +3,9 @@ import datetime
 import pytest
 from google.cloud import datastore
 
-from src.google_cloud_datastore_odm.client import get_client
-from src.google_cloud_datastore_odm.model import Model, field_validator
-from src.google_cloud_datastore_odm.properties import DateProperty, IntegerProperty, Property, StringProperty
+from google_cloud_datastore_odm.client import get_client
+from google_cloud_datastore_odm.model import Model, field_validator
+from google_cloud_datastore_odm.properties import DateProperty, IntegerProperty, Property, StringProperty
 
 
 class KeyTestModel(Model):
@@ -14,6 +14,7 @@ class KeyTestModel(Model):
 
 def test_model_invalid_kind():
     with pytest.raises(TypeError):
+
         class InvalidKindModel(Model):
             class Meta:
                 kind = 123
@@ -22,9 +23,9 @@ def test_model_invalid_kind():
 def test_model_repr_with_key():
     model = KeyTestModel(name="test")
     assert "id=None" not in repr(model)
-    
+
     model.allocate_key()
-    assert 'id=' in repr(model)
+    assert "id=" in repr(model)
 
 
 def test_model_to_dict():
@@ -49,7 +50,7 @@ def test_id_property():
     client = get_client()
     model.key = client.key("KeyTestModel", 123)
     assert model.key.id == 123
-    
+
     model.key = client.key("KeyTestModel", "named_key")
     assert model.key.name == "named_key"
 
@@ -58,10 +59,10 @@ def test_key_from_id_and_get_by_id(reset_datastore):
     key = KeyTestModel.key_from_id(123)
     assert key.id == 123
     assert key.kind == "KeyTestModel"
-    
+
     model = KeyTestModel(name="test", key=key)
     model.put()
-    
+
     fetched = KeyTestModel.get_by_id(123)
     assert fetched is not None
     assert fetched.name == "test"
@@ -74,11 +75,11 @@ def test_from_entity_none():
 
 def test_model_invalid_validator_not_callable():
     with pytest.raises(TypeError):
+
         class Mock(object):
             pass
 
         class InvalidValidator(Model):
-            
             mock = Mock()
             mock.__model_validator__ = True
 
@@ -116,6 +117,7 @@ def test_strict_schema_kwargs():
 
 def test_uncopyable_default():
     import threading
+
     lock = threading.Lock()  # Thread locks cannot be pickled/deepcopied
 
     class UncopyableModel(Model):
@@ -151,7 +153,8 @@ def test_init_with_callable_default():
 
 def test_get_schema_formats():
 
-    def dynamic_default(): pass
+    def dynamic_default():
+        pass
 
     class SchemaTestModel(Model):
         title = StringProperty(required=True)
@@ -189,6 +192,7 @@ def test_metaclass_rejects_reserved_property_names():
     """Ensure the ODM protects its internal identity attributes."""
 
     with pytest.raises(ValueError):
+
         class BadModelKey(Model):
             key = StringProperty()
 
@@ -200,9 +204,9 @@ def test_metaclass_allows_aliased_reserved_names():
         custom_id = StringProperty(name="id")
         custom_key = StringProperty(name="key")
 
-    assert "custom_id" in ValidModel.get_schema(output_format='property_names')
-    assert ValidModel.get_schema(output_format='property_aliases')["custom_id"] == "id"
-    assert ValidModel.get_schema(output_format='named_properties')["custom_key"].datastore_name == "key"
+    assert "custom_id" in ValidModel.get_schema(output_format="property_names")
+    assert ValidModel.get_schema(output_format="property_aliases")["custom_id"] == "id"
+    assert ValidModel.get_schema(output_format="named_properties")["custom_key"].datastore_name == "key"
 
 
 def test_model_init_reserved_kwargs_routing():
@@ -290,7 +294,7 @@ def test_repr_numeric_id():
     assert "id=123" in repr_str
     assert "val=5" in repr_str
 
-    instance = ReprModel(id='123', val=5)
+    instance = ReprModel(id="123", val=5)
     repr_str = repr(instance)
     assert "id='123'" in repr_str
     assert "val=5" in repr_str
@@ -339,7 +343,7 @@ def test_populate_failures():
         name = StringProperty()
         age = IntegerProperty()
 
-        @field_validator('age')
+        @field_validator("age")
         def validate_adult(self, value: int) -> int:
             if value < 18:
                 raise ValueError("Only adults are allowed.")
@@ -393,11 +397,7 @@ def test_put_exclude_from_indexes_emulator(reset_datastore):
 
     client = get_client()
 
-    instance = IndexTestModel(
-        normal="A",
-        always_unindexed="B",
-        dynamic_unindexed="C"
-    )
+    instance = IndexTestModel(normal="A", always_unindexed="B", dynamic_unindexed="C")
 
     instance.put(exclude_from_indexes=["dynamic_unindexed"])
 
@@ -433,6 +433,7 @@ def test_put_exclude_from_indexes_emulator(reset_datastore):
 
 def test_model_equality():
     """Ensure __eq__ strictly compares both keys and underlying values (NDB style)."""
+
     class EqModel(Model):
         name = StringProperty()
 
@@ -486,11 +487,7 @@ def test_get_multi(reset_datastore):
     class BatchGetModel(Model):
         val = IntegerProperty()
 
-    instances = [
-        BatchGetModel(id=1, val=10),
-        BatchGetModel(id=2, val=20),
-        BatchGetModel(id=3, val=30)
-    ]
+    instances = [BatchGetModel(id=1, val=10), BatchGetModel(id=2, val=20), BatchGetModel(id=3, val=30)]
     keys = BatchGetModel.put_multi(instances)
 
     fetch_keys = [keys[2], keys[0], keys[1]]
@@ -519,11 +516,7 @@ def test_put_multi(reset_datastore):
     class BatchPutModel(Model):
         val = IntegerProperty()
 
-    instances = [
-        BatchPutModel(id=101, val=10),
-        BatchPutModel(id=102, val=20),
-        BatchPutModel(val=30)
-    ]
+    instances = [BatchPutModel(id=101, val=10), BatchPutModel(id=102, val=20), BatchPutModel(val=30)]
 
     keys = BatchPutModel.put_multi(instances)
 
@@ -549,11 +542,7 @@ def test_delete_multi(reset_datastore):
     class BatchDelModel(Model):
         val = IntegerProperty()
 
-    instances = [
-        BatchDelModel(val=1),
-        BatchDelModel(val=2),
-        BatchDelModel(val=3)
-    ]
+    instances = [BatchDelModel(val=1), BatchDelModel(val=2), BatchDelModel(val=3)]
     keys = BatchDelModel.put_multi(instances)
 
     assert BatchDelModel.get(keys[0]) is not None
@@ -700,6 +689,7 @@ def test_lifecycle_hooks(reset_datastore):
 
 def test_multi_tenant_routing_coverage():
     """Cover all namespace and project routing branches in Model and Query."""
+
     class TenantModel(Model):
         class Meta:
             kind = "Tenant"
@@ -750,6 +740,7 @@ def test_multi_tenant_routing_coverage():
 
 def test_multi_batch_project_mismatch():
     """Ensure batch operations fail fast if instances belong to different projects."""
+
     class BatchModel(Model):
         pass
 
@@ -822,8 +813,8 @@ def test_model_put_repeated_property_serialization():
 
     saved_entity = ArrayModel.get_by_id(instance_key.id_or_name)
 
-    assert isinstance(saved_entity['dates'][0], datetime.date)
-    assert isinstance(saved_entity['dates'][1], datetime.date)
+    assert isinstance(saved_entity["dates"][0], datetime.date)
+    assert isinstance(saved_entity["dates"][1], datetime.date)
 
 
 def test_model_put_multi_repeated_property_serialization():
@@ -837,7 +828,7 @@ def test_model_put_multi_repeated_property_serialization():
 
     saved_entities = ArrayModel.get_multi(instances_keys)
 
-    assert isinstance(saved_entities[0]['dates'][0], datetime.date)
+    assert isinstance(saved_entities[0]["dates"][0], datetime.date)
 
 
 def test_model_from_entity_repeated_property_hydration():
@@ -847,12 +838,14 @@ def test_model_from_entity_repeated_property_hydration():
         dates: list = DateProperty(repeated=True)
 
     ds_entity = datastore.Entity()
-    ds_entity.update({
-        'dates': [
-            datetime.datetime(2025, 1, 1, tzinfo=datetime.timezone.utc),
-            datetime.datetime(2025, 1, 2, tzinfo=datetime.timezone.utc)
-        ]
-    })
+    ds_entity.update(
+        {
+            "dates": [
+                datetime.datetime(2025, 1, 1, tzinfo=datetime.timezone.utc),
+                datetime.datetime(2025, 1, 2, tzinfo=datetime.timezone.utc),
+            ]
+        }
+    )
 
     instance = ArrayModel.from_entity(ds_entity)
 
@@ -869,9 +862,9 @@ def test_model_from_entity_safe_key_missing():
     class EmbeddedEntityStub(dict):
         pass
 
-    stub = EmbeddedEntityStub({'name': 'Alice'})
+    stub = EmbeddedEntityStub({"name": "Alice"})
 
-    assert not hasattr(stub, 'key')
+    assert not hasattr(stub, "key")
 
     instance = SimpleModel.from_entity(stub)
 

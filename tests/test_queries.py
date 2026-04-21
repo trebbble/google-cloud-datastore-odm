@@ -5,8 +5,8 @@ import pytest
 from google.cloud.datastore import Key, query
 from google.cloud.datastore.aggregation import AggregationQuery
 
-from src.google_cloud_datastore_odm import AND, OR, IntegerProperty, Model, StringProperty
-from src.google_cloud_datastore_odm.query import Avg, CompositeNode, Count, FilterNode, Node, OrderNode, Query, Sum
+from google_cloud_datastore_odm import AND, OR, IntegerProperty, Model, StringProperty
+from google_cloud_datastore_odm.query import Avg, CompositeNode, Count, FilterNode, Node, OrderNode, Query, Sum
 from tests.conftest import QueryTestModel
 
 
@@ -38,11 +38,7 @@ def test_persistence(reset_datastore, query_model_instance):
 def test_query_filter_raw_single(reset_datastore, query_model_instance):
     query_model_instance.put()
 
-    results = list(
-        QueryTestModel.query()
-        .filter("age", "=", 30)
-        .fetch()
-    )
+    results = list(QueryTestModel.query().filter("age", "=", 30).fetch())
 
     assert len(results) == 1
     result: QueryTestModel = results[0]
@@ -53,12 +49,7 @@ def test_query_filter_raw_single(reset_datastore, query_model_instance):
 def test_query_filter_raw_multiple(reset_datastore, query_model_instance):
     query_model_instance.put()
 
-    results = list(
-        QueryTestModel.query()
-        .filter("age", "=", 30)
-        .filter("name", "=", "Bob")
-        .fetch()
-    )
+    results = list(QueryTestModel.query().filter("age", "=", 30).filter("name", "=", "Bob").fetch())
 
     assert results
     first: QueryTestModel = results[0]
@@ -136,10 +127,7 @@ def test_ast_translation():
     assert sdk_filter.operator == "="
     assert sdk_filter.value == "Bob"
 
-    node = OR(
-        AND(ASTUser.name == "Bob", ASTUser.age > 20),
-        ASTUser.role == "admin"
-    )
+    node = OR(AND(ASTUser.name == "Bob", ASTUser.age > 20), ASTUser.role == "admin")
     sdk_composite = base_query._translate(node)
 
     assert isinstance(sdk_composite, query.Or)
@@ -167,9 +155,7 @@ def test_odm_style_in_operator(seed_data):
 
 def test_odm_style_or_operator(seed_data):
     results: list[QueryTestModel] = list(
-        QueryTestModel.query()
-        .filter(OR(QueryTestModel.name == "Bob", QueryTestModel.age == 40))
-        .fetch()
+        QueryTestModel.query().filter(OR(QueryTestModel.name == "Bob", QueryTestModel.age == 40)).fetch()
     )
     assert len(results) == 2
     assert {u.name for u in results} == {"Bob", "Alice"}
@@ -177,9 +163,9 @@ def test_odm_style_or_operator(seed_data):
 
 def test_odm_style_bitwise_operators(seed_data):
     results: list[QueryTestModel] = list(
-        QueryTestModel.query().filter(
-            ((QueryTestModel.name == "Alice") & (QueryTestModel.age == 25)) | (QueryTestModel.name == "Bob")
-        ).fetch()
+        QueryTestModel.query()
+        .filter(((QueryTestModel.name == "Alice") & (QueryTestModel.age == 25)) | (QueryTestModel.name == "Bob"))
+        .fetch()
     )
     assert len(results) == 2
     assert {u.age for u in results} == {25, 30}
@@ -249,6 +235,7 @@ def test_query_translate_unknown_node():
 
     class DummyNode(Node):
         """A fake node that doesn't inherit from FilterNode or CompositeNode."""
+
         pass
 
     with pytest.raises(TypeError, match="Unknown node type"):
@@ -285,9 +272,7 @@ def test_query_projection(seed_data):
 
 def test_query_distinct(seed_data):
     """Ensure distinct_on filters out duplicate rows based on the projection."""
-    unique_authors = list(
-        QueryTestModel.query().projection(QueryTestModel.name).distinct_on(QueryTestModel.name).fetch()
-    )
+    unique_authors = list(QueryTestModel.query().projection(QueryTestModel.name).distinct_on(QueryTestModel.name).fetch())
 
     assert len(unique_authors) == 3
     names = {r.name for r in unique_authors}
@@ -304,8 +289,9 @@ def test_query_get(seed_data):
     nobody = QueryTestModel.query().filter(QueryTestModel.name == "Zebra").get()
     assert nobody is None
 
-    projected_bob: QueryTestModel = QueryTestModel.query().filter(QueryTestModel.name == "Bob"
-                                                                  ).projection(QueryTestModel.age).get()
+    projected_bob: QueryTestModel = (
+        QueryTestModel.query().filter(QueryTestModel.name == "Bob").projection(QueryTestModel.age).get()
+    )
     assert getattr(projected_bob, "_is_projected", False) is True
     assert projected_bob.age == 30
 
@@ -372,7 +358,7 @@ def test_query_fetch_page_stop_iteration():
     mock_native_query.fetch.return_value.pages = iter([])
 
     # Patch the _build method to return our mock instead of a real SDK query
-    with patch.object(q, '_build', return_value=mock_native_query):
+    with patch.object(q, "_build", return_value=mock_native_query):
         page, cursor, has_more = q.fetch_page(page_size=10)
 
     # Assert the fallback block worked perfectly
@@ -408,9 +394,7 @@ def test_query_avg_aggregation(seed_data):
 def test_query_aggregate_batch(seed_data):
     """Ensure aggregate() performs multiple calculations in a single call."""
     stats = QueryTestModel.query().aggregate(
-        total_people=Count(),
-        total_age=Sum(QueryTestModel.age),
-        average_age=Avg(QueryTestModel.age)
+        total_people=Count(), total_age=Sum(QueryTestModel.age), average_age=Avg(QueryTestModel.age)
     )
 
     assert stats["total_people"] == 4
@@ -420,9 +404,8 @@ def test_query_aggregate_batch(seed_data):
 
 def test_query_aggregate_filtered(seed_data):
     """Ensure aggregate() respects query filters."""
-    stats = QueryTestModel.query().filter(QueryTestModel.name == "Alice").aggregate(
-        total=Count(),
-        sum_age=Sum(QueryTestModel.age)
+    stats = (
+        QueryTestModel.query().filter(QueryTestModel.name == "Alice").aggregate(total=Count(), sum_age=Sum(QueryTestModel.age))
     )
 
     assert stats["total"] == 2
@@ -431,9 +414,10 @@ def test_query_aggregate_filtered(seed_data):
 
 def test_query_aggregate_empty_dataset(seed_data):
     """Ensure aggregate() gracefully handles queries that match zero entities."""
-    stats = QueryTestModel.query().filter(QueryTestModel.name == "NonExistent").aggregate(
-        total=Count(),
-        average_age=Avg(QueryTestModel.age)
+    stats = (
+        QueryTestModel.query()
+        .filter(QueryTestModel.name == "NonExistent")
+        .aggregate(total=Count(), average_age=Avg(QueryTestModel.age))
     )
 
     assert stats["total"] == 0
@@ -454,7 +438,7 @@ def test_query_aggregate_no_results_mock():
     """Ensure aggregate() safely handles a catastrophic SDK failure returning empty lists."""
     q = QueryTestModel.query()
 
-    with patch.object(AggregationQuery, 'fetch', return_value=[]):
+    with patch.object(AggregationQuery, "fetch", return_value=[]):
         stats = q.aggregate(total=Count())
 
         assert stats == {"total": None}
@@ -462,6 +446,7 @@ def test_query_aggregate_no_results_mock():
 
 def test_query_unindexed_warnings():
     """Ensure queries using unindexed properties emit a UserWarning during _build()."""
+
     class SearchModel(Model):
         title = StringProperty()
         body = StringProperty(indexed=False)

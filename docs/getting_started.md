@@ -26,7 +26,7 @@ Models are defined by inheriting from the `Model` class. You map Datastore field
 
 ```python
 import datetime
-from src.google_cloud_datastore_odm import (
+from google_cloud_datastore_odm import (
     KeyProperty,
     StructuredProperty,
     PickleProperty,
@@ -108,7 +108,7 @@ The ODM provides three distinct layers of validation to ensure bad data never re
 ### Inline Property Validators
 Passed directly to the property definition. They run first.
 ```python
-from src.google_cloud_datastore_odm import Model, StringProperty
+from google_cloud_datastore_odm import Model, StringProperty
 
 def no_emoji_allowed(value: str) -> str:
     for char in value:
@@ -123,7 +123,7 @@ class Comment(Model):
 ### Field-Level Validators
 Decorated with `@field_validator('property_name')`. These run automatically during property assignment.
 ```python
-from src.google_cloud_datastore_odm import Model, StringProperty, IntegerProperty, field_validator
+from google_cloud_datastore_odm import Model, StringProperty, IntegerProperty, field_validator
 
 class Article(Model):
     title = StringProperty(required=True)
@@ -145,7 +145,7 @@ class Article(Model):
 Decorated with `@model_validator`. These run right before `put` operations are called, right before any pre-put hooks,
 and are used for cross-property logic.
 ```python
-from src.google_cloud_datastore_odm import Model, StringProperty, IntegerProperty, model_validator
+from google_cloud_datastore_odm import Model, StringProperty, IntegerProperty, model_validator
 
 class Article(Model):
     title = StringProperty(required=True)
@@ -167,7 +167,7 @@ class Article(Model):
 You can create instances using standard keyword arguments. To explicitly set a custom string ID, use the `id` shortcut.
 
 ```python
-from src.google_cloud_datastore_odm import Model, StringProperty, IntegerProperty
+from google_cloud_datastore_odm import Model, StringProperty, IntegerProperty
 
 class Article(Model):
     title = StringProperty(required=True)
@@ -200,7 +200,7 @@ print(f"Saved with ID: {article.key.id_or_name}")
 The ODM provides familiar NDB-style methods for retrieving data.
 
 ```python
-from src.google_cloud_datastore_odm import Model, StringProperty, IntegerProperty, StructuredProperty, OR, or_, AND, and_, Count, Sum, Avg
+from google_cloud_datastore_odm import Model, StringProperty, IntegerProperty, StructuredProperty, OR, or_, AND, and_, Count, Sum, Avg
 
 class Address(Model):
     city = StringProperty()
@@ -325,7 +325,7 @@ stats = base_query.aggregate(
 Instances are strictly compared. For two instances to be equal (`==`), they must have the exact same Datastore `Key` **and** their underlying unsaved memory states must match perfectly.
 
 ```python
-from src.google_cloud_datastore_odm import Model, StringProperty, IntegerProperty
+from google_cloud_datastore_odm import Model, StringProperty, IntegerProperty
 
 class Article(Model):
     title = StringProperty(required=True)
@@ -361,7 +361,7 @@ print(fetched == fetched_by_id) # False (Memory state drifted)
 Batch operations execute in a single RPC call, saving massive amounts of network overhead.
 
 ```python
-from src.google_cloud_datastore_odm import Model, StringProperty, IntegerProperty
+from google_cloud_datastore_odm import Model, StringProperty, IntegerProperty
 
 class Article(Model):
     title = StringProperty(required=True)
@@ -393,7 +393,7 @@ Article.delete_multi(batch_keys)
 If you need to map to a legacy column actually named "key" or "id" in Datastore, define the Python property safely and use the `name=` parameter. Provide explicit routing info using the `_` prefix.
 
 ```python
-from src.google_cloud_datastore_odm import Model, StringProperty, IntegerProperty
+from google_cloud_datastore_odm import Model, StringProperty, IntegerProperty
 class LegacyDataModel(Model):
     id = IntegerProperty() # your business logic ID
     legacy_key = StringProperty(name='key') # alias for actual Datastore field called 'key' ; 'key' attribute is reserved
@@ -406,7 +406,7 @@ instance = LegacyDataModel(_id="123", id=1, legacy_key="some-string-data")
 You can manually reserve blocks of IDs from the Datastore before creating your objects.
 
 ```python
-from src.google_cloud_datastore_odm import Model, StringProperty, IntegerProperty
+from google_cloud_datastore_odm import Model, StringProperty, IntegerProperty
 
 class Article(Model):
     title = StringProperty(required=True)
@@ -431,7 +431,7 @@ reserved_keys = Article.allocate_ids(size=5)
 Models natively support NDB-style hooks (`_pre_put_hook`, `_post_get_hook`, etc.) that execute during standard and batch CRUD operations.
 
 ```python
-from src.google_cloud_datastore_odm import Model, StringProperty
+from google_cloud_datastore_odm import Model, StringProperty
 
 class TrackedTask(Model):
     description = StringProperty()
@@ -462,7 +462,7 @@ fetched_task = TrackedTask.get(task_key)
 Google Cloud Datastore is heavily used for multi-tenant applications. The ODM natively supports routing data to specific GCP Projects or Datastore Namespaces. You can define static routing defaults using an inner `Meta` class, or dynamically override them on the fly for specific instances or queries.
 
 ```python
-from src.google_cloud_datastore_odm import Model, StringProperty
+from google_cloud_datastore_odm import Model, StringProperty
 
 class SystemLog(Model):
     event = StringProperty()

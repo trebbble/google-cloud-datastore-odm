@@ -10,7 +10,8 @@ nav = [
         { "Client" = "api/client.md" },
         { "Model" = "api/model.md" },
         { "Properties" = "api/properties.md" },
-        { "Query" = "api/query.md" }
+        { "Query" = "api/query.md" },
+        { "Transaction" = "api/transaction.md" },
     ]}
 ]
 

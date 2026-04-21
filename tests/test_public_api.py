@@ -1,5 +1,5 @@
-from src.google_cloud_datastore_odm.model import Model
-from src.google_cloud_datastore_odm.properties import IntegerProperty, StringProperty
+from google_cloud_datastore_odm.model import Model
+from google_cloud_datastore_odm.properties import IntegerProperty, StringProperty
 
 
 class Article(Model):

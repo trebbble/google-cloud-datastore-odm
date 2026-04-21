@@ -4,9 +4,9 @@ import pytest
 from google.cloud import datastore
 from google.cloud.datastore.helpers import GeoPoint
 
-from src.google_cloud_datastore_odm.client import get_client
-from src.google_cloud_datastore_odm.model import Model, field_validator
-from src.google_cloud_datastore_odm.properties import (
+from google_cloud_datastore_odm.client import get_client
+from google_cloud_datastore_odm.model import Model, field_validator
+from google_cloud_datastore_odm.properties import (
     BooleanProperty,
     BytesProperty,
     ComputedProperty,
@@ -28,7 +28,7 @@ from src.google_cloud_datastore_odm.properties import (
 
 
 def reject_trigger_value(value):
-    if value == 'trigger_error':
+    if value == "trigger_error":
         raise ValueError("Triggered error")
     return value
 
@@ -38,20 +38,20 @@ class DemoModel(Model):
     number_field = IntegerProperty()
     custom_validated = StringProperty(validators=[reject_trigger_value])
 
-    @field_validator('text_field')
+    @field_validator("text_field")
     def validate_text_field_length(self, value: str) -> str:
         if len(value) < 2 or len(value) > 5:
             raise ValueError("Text characters length should be [2-5].")
         return value
 
-    @field_validator('text_field')
+    @field_validator("text_field")
     def validate_text_field_choices(self, value: str) -> str:
         if value not in ["hi", "hey"]:
             raise ValueError("Text characters should be [hi,hey].")
 
         return value
 
-    @field_validator('number_field')
+    @field_validator("number_field")
     def validate_number_field(self, value: int) -> int:
         if value < 1 or value > 10:
             raise ValueError("Number should be in [1-10].")
@@ -125,7 +125,7 @@ def test_field_type_enforcement():
         instance.text = 123
 
     with pytest.raises(TypeError):
-        instance.integer = 'test'
+        instance.integer = "test"
 
     with pytest.raises(TypeError):
         instance.integer = True
@@ -181,7 +181,7 @@ def test_text_property():
     instance = TextModel()
     instance.body = "A very long text block..."
     assert instance.body == "A very long text block..."
-    prop = TextModel._properties['body']
+    prop = TextModel._properties["body"]
 
     assert prop._to_base_type("normal string") == "normal string"
     assert prop._from_base_type("normal string") == "normal string"
@@ -193,13 +193,14 @@ def test_text_property():
         prop._to_base_type(123)
 
     with pytest.raises(ValueError):
+
         class BadTextModel(Model):
             body = TextProperty(indexed=True)
 
     class CompressedTextModel(Model):
         body = TextProperty(compressed=True)
 
-    prop = CompressedTextModel._properties['body']
+    prop = CompressedTextModel._properties["body"]
 
     datastore_value = prop._to_base_type("Compress me please")
     assert isinstance(datastore_value, bytes)
@@ -232,13 +233,14 @@ def test_json_property():
         instance.data = CustomObj()
 
     with pytest.raises(ValueError):
+
         class BadJsonModel(Model):
             data = JsonProperty(indexed=True, compressed=True)
 
     class CompressedJsonModel(Model):
         data = JsonProperty(compressed=True)
 
-    prop = CompressedJsonModel._properties['data']
+    prop = CompressedJsonModel._properties["data"]
     test_payload = {"deep": {"nested": "value"}}
 
     datastore_value = prop._to_base_type(test_payload)
@@ -249,7 +251,7 @@ def test_json_property():
 
     assert prop._to_base_type(None) is None
 
-    prop = JsonModel._properties['data']
+    prop = JsonModel._properties["data"]
     assert prop._to_base_type({"key": "value"}) == {"key": "value"}
 
     class UnserializableObject:
@@ -297,11 +299,12 @@ def test_field_optional_none_value():
 
 def test_metaclass_rejects_non_callable_field_validator():
     with pytest.raises(TypeError):
+
         class MockValidator:
             pass
 
         bad_mock = MockValidator()
-        bad_mock.__field_validator__ = 'text'
+        bad_mock.__field_validator__ = "text"
 
         class BadModel(Model):
             text = StringProperty()
@@ -369,10 +372,7 @@ def test_json_property_from_base_type_scrubs_entities():
 
     assert isinstance(instance.data["nested"], dict)
     assert not isinstance(instance.data["nested"], datastore.Entity)
-    assert instance.data == {
-        "nested": {"inner_key": "inner_value"},
-        "list": [1, 2]
-    }
+    assert instance.data == {"nested": {"inner_key": "inner_value"}, "list": [1, 2]}
 
 
 def test_json_property_from_base_type_handles_none():
@@ -413,9 +413,9 @@ def test_datetime_auto_now_add():
 
     instance = TimeModel()
 
-    TimeModel._properties['created_at']._prepare_for_put(instance)
-    TimeModel._properties['updated_at']._prepare_for_put(instance)
-    TimeModel._properties['time_auto']._prepare_for_put(instance)
+    TimeModel._properties["created_at"]._prepare_for_put(instance)
+    TimeModel._properties["updated_at"]._prepare_for_put(instance)
+    TimeModel._properties["time_auto"]._prepare_for_put(instance)
 
     assert isinstance(instance.created_at, datetime.datetime)
     assert isinstance(instance.updated_at, datetime.datetime)
@@ -435,33 +435,33 @@ def test_date_and_time_property_casting():
         instance.day = datetime.datetime.now()
 
     # noinspection PyProtectedMember
-    ds_day = SchedModel._properties['day']._to_base_type(instance.day)
+    ds_day = SchedModel._properties["day"]._to_base_type(instance.day)
     assert isinstance(ds_day, datetime.datetime)
     assert ds_day.year == 2025
 
     # noinspection PyProtectedMember
-    py_day = SchedModel._properties['day']._from_base_type(ds_day)
+    py_day = SchedModel._properties["day"]._from_base_type(ds_day)
     assert isinstance(py_day, datetime.date)
 
     # noinspection PyProtectedMember
-    ds_hour = SchedModel._properties['hour']._to_base_type(instance.hour)
+    ds_hour = SchedModel._properties["hour"]._to_base_type(instance.hour)
     assert isinstance(ds_hour, datetime.datetime)
     assert ds_hour.year == 1970
     assert ds_hour.hour == 14
 
     # noinspection PyProtectedMember
-    py_hour = SchedModel._properties['hour']._from_base_type(ds_hour)
+    py_hour = SchedModel._properties["hour"]._from_base_type(ds_hour)
     assert isinstance(py_hour, datetime.time)
 
     # --- None Casts (Covering the early exit branches) ---
     # noinspection PyProtectedMember
-    assert SchedModel._properties['day']._to_base_type(None) is None
+    assert SchedModel._properties["day"]._to_base_type(None) is None
     # noinspection PyProtectedMember
-    assert SchedModel._properties['day']._from_base_type(None) is None
+    assert SchedModel._properties["day"]._from_base_type(None) is None
     # noinspection PyProtectedMember
-    assert SchedModel._properties['hour']._to_base_type(None) is None
+    assert SchedModel._properties["hour"]._to_base_type(None) is None
     # noinspection PyProtectedMember
-    assert SchedModel._properties['hour']._from_base_type(None) is None
+    assert SchedModel._properties["hour"]._from_base_type(None) is None
 
 
 def test_datetime_hydration_conversions():
@@ -477,12 +477,14 @@ def test_datetime_hydration_conversions():
 
     utc_now = datetime.datetime(2025, 1, 1, 12, 0, tzinfo=datetime.timezone.utc)
 
-    ds_entity.update({
-        "dt_aware": datetime.datetime(2025, 1, 1, 12, 0),
-        "dt_naive": utc_now,
-        "d": utc_now,
-        "t": utc_now,
-    })
+    ds_entity.update(
+        {
+            "dt_aware": datetime.datetime(2025, 1, 1, 12, 0),
+            "dt_naive": utc_now,
+            "d": utc_now,
+            "t": utc_now,
+        }
+    )
 
     instance = TzModel.from_entity(ds_entity)
 
@@ -496,6 +498,7 @@ def test_datetime_and_time_edge_cases_via_model():
     """Test Datetime/Date/Time edge cases using high-level model API."""
 
     with pytest.raises(ValueError):
+
         class BadModel(Model):
             dt = DateTimeProperty(repeated=True, auto_now=True)
 
@@ -520,7 +523,7 @@ def test_datetime_and_time_edge_cases_via_model():
         instance.dt_naive = datetime.datetime.now(datetime.timezone.utc)
 
     # noinspection PyProtectedMember
-    assert ChronoModel._properties['dt_naive']._from_base_type(None) is None
+    assert ChronoModel._properties["dt_naive"]._from_base_type(None) is None
 
     class BypassModel(Model):
         created_at = DateProperty(auto_now_add=True)
@@ -548,7 +551,7 @@ def test_datetime_naive_to_naive_pass_through():
     naive_val = datetime.datetime(2025, 1, 1, 12, 0)
 
     # noinspection PyProtectedMember
-    result = NaiveModel._properties['dt']._from_base_type(naive_val)
+    result = NaiveModel._properties["dt"]._from_base_type(naive_val)
 
     # It should pass straight through untouched
     assert result.tzinfo is None
@@ -576,7 +579,7 @@ def test_bytes_property():
     class BytesModel(Model):
         blob = BytesProperty()
 
-    prop = BytesModel._properties['blob']
+    prop = BytesModel._properties["blob"]
     assert prop.indexed is False
     raw_data = b"raw byte data"
     assert prop._to_base_type(raw_data) is raw_data
@@ -590,13 +593,14 @@ def test_bytes_property():
         instance.blob = "I am a string, not bytes"
 
     with pytest.raises(ValueError):
+
         class BadBytesModel(Model):
             blob = BytesProperty(indexed=True, compressed=True)
 
     class CompressedBytesModel(Model):
         blob = BytesProperty(compressed=True)
 
-    prop = CompressedBytesModel._properties['blob']
+    prop = CompressedBytesModel._properties["blob"]
     original_data = b"compress this repetitive byte sequence " * 20
 
     datastore_value = prop._to_base_type(original_data)
@@ -693,7 +697,7 @@ def test_structured_property():
     with pytest.raises(TypeError):
         instance.home = {"city": "London"}
 
-    prop = UserModel._properties['home']
+    prop = UserModel._properties["home"]
     ds_entity = prop._to_base_type(address)
     assert isinstance(ds_entity, datastore.Entity)
     assert ds_entity["city"] == "London"
@@ -716,7 +720,7 @@ def test_structured_property_unindexed_propagation():
     class FastUserModel(Model):
         home = StructuredProperty(Address, indexed=False)
 
-    prop = FastUserModel._properties['home']
+    prop = FastUserModel._properties["home"]
     address = Address(city="London", zip_code=10001)
 
     ds_entity = prop._to_base_type(address)
@@ -757,7 +761,7 @@ def test_structured_property_repeated_array_mapping():
     t2 = TagNode(label="Beta")
     instance.tags = [t1, t2]
 
-    prop = ArrayUserModel._properties['tags']
+    prop = ArrayUserModel._properties["tags"]
 
     result_array = [prop._to_base_type(v) for v in instance.tags]
 
@@ -775,7 +779,7 @@ def test_structured_property_nested_repeated_field():
     class OuterModel(Model):
         inner = StructuredProperty(InnerModel)
 
-    prop = OuterModel._properties['inner']
+    prop = OuterModel._properties["inner"]
     inner_instance = InnerModel(tags=["python", "odm"])
 
     ds_entity = prop._to_base_type(inner_instance)
@@ -793,7 +797,7 @@ def test_structured_property_from_base_type_raw_dict():
     class OuterModel(Model):
         inner = StructuredProperty(InnerModel)
 
-    prop = OuterModel._properties['inner']
+    prop = OuterModel._properties["inner"]
 
     raw_dict = {"name": "Alice"}
     hydrated = prop._from_base_type(raw_dict)
@@ -804,6 +808,7 @@ def test_structured_property_from_base_type_raw_dict():
 
 def test_structured_property_rejects_repeated_deep_query():
     """Verify that querying sub-properties of an array raises a clear error."""
+
     class Inner(Model):
         field = StringProperty()
 
@@ -818,7 +823,7 @@ def test_pickle_property():
     class PickleModel(Model):
         state = PickleProperty()
 
-    prop = PickleModel._properties['state']
+    prop = PickleModel._properties["state"]
     assert prop.indexed is False
 
     instance = PickleModel()
@@ -837,7 +842,7 @@ def test_pickle_property():
     class CompressedPickleModel(Model):
         state = PickleProperty(compressed=True)
 
-    comp_prop = CompressedPickleModel._properties['state']
+    comp_prop = CompressedPickleModel._properties["state"]
 
     ds_value = comp_prop._to_base_type(weird_data)
     assert isinstance(ds_value, bytes)
@@ -849,6 +854,7 @@ def test_pickle_property():
     assert prop._from_base_type(None) is None
 
     with pytest.raises(ValueError):
+
         class BadPickleModel(Model):
             state = PickleProperty(indexed=True, compressed=True)
 
@@ -878,7 +884,7 @@ def test_generic_property():
         payload = GenericProperty()
 
     instance = DynamicModel()
-    prop = DynamicModel._properties['payload']
+    prop = DynamicModel._properties["payload"]
 
     instance.payload = "Hello"
     assert instance.payload == "Hello"
@@ -890,6 +896,7 @@ def test_generic_property():
     instance.payload = complex_dict
 
     from google.cloud.datastore import Entity
+
     mock_sdk_return = Entity()
     mock_sdk_return.update(complex_dict)
 
@@ -907,7 +914,7 @@ def test_generic_property():
     class CompressedDynamicModel(Model):
         payload = GenericProperty(compressed=True)
 
-    comp_prop = CompressedDynamicModel._properties['payload']
+    comp_prop = CompressedDynamicModel._properties["payload"]
     assert comp_prop.indexed is False
 
     raw_bytes = b"hello world bytes data"
@@ -922,6 +929,7 @@ def test_generic_property():
     assert ds_str == raw_str
 
     with pytest.raises(ValueError):
+
         class BadDynamicModel(Model):
             payload = GenericProperty(indexed=True, compressed=True)
 
@@ -947,21 +955,20 @@ def test_computed_property():
     assert instance.unindexed_size == 4
     assert instance.lower_name == "data"
 
-    assert FileModel._properties['unindexed_size'].indexed is False
+    assert FileModel._properties["unindexed_size"].indexed is False
 
     with pytest.raises(AttributeError):
         instance.size = 5
 
-    prop_size = FileModel._properties['size']
+    prop_size = FileModel._properties["size"]
     prop_size._prepare_for_put(instance)
-    assert instance._values['size'] == 4
+    assert instance._values["size"] == 4
 
     instance._is_projected = True
-    instance._values['size'] = 99
+    instance._values["size"] = 99
     assert instance.size == 99
 
     instance = FileModel(name="data", size=2)
     assert instance.size == 4
     with pytest.raises(AttributeError):
         instance.size = 5
-

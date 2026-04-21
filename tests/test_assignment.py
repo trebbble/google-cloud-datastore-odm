@@ -1,7 +1,7 @@
 import pytest
 
-from src.google_cloud_datastore_odm.model import Model
-from src.google_cloud_datastore_odm.properties import StringProperty
+from google_cloud_datastore_odm.model import Model
+from google_cloud_datastore_odm.properties import StringProperty
 from tests.conftest import Constants
 
 

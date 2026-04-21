@@ -1,7 +1,7 @@
 import pytest
 
-from src.google_cloud_datastore_odm.model import Model, field_validator, model_validator
-from src.google_cloud_datastore_odm.properties import IntegerProperty, StringProperty
+from google_cloud_datastore_odm.model import Model, field_validator, model_validator
+from google_cloud_datastore_odm.properties import IntegerProperty, StringProperty
 
 
 def append_suffix_inline(value: str) -> str:
@@ -21,7 +21,7 @@ class OrderVerificationModel(Model):
     chain_field = StringProperty(validators=[append_suffix_inline])
     amount = IntegerProperty()
 
-    @field_validator('chain_field')
+    @field_validator("chain_field")
     def append_suffix_field(self, value: str) -> str:
         return value + "_field"
 
@@ -69,7 +69,7 @@ def test_inherited_validators():
         shared_text = StringProperty()
         parent_count = IntegerProperty(default=0)
 
-        @field_validator('shared_text')
+        @field_validator("shared_text")
         def validate_shared_text(self, value: str) -> str:
             if value == "bad_parent_value":
                 raise ValueError("Blocked by parent field validator")
@@ -88,13 +88,13 @@ def test_inherited_validators():
             if self.child_text == "bad_child":
                 raise ValueError("Blocked by child model validator")
 
-    assert 'shared_text' in ChildModel._field_validators
-    assert 'validate_shared_text' in ChildModel._field_validators['shared_text']
+    assert "shared_text" in ChildModel._field_validators
+    assert "validate_shared_text" in ChildModel._field_validators["shared_text"]
 
     assert len(ChildModel._model_validators) == 2
     validator_names = [v.__name__ for v in ChildModel._model_validators]
-    assert 'validate_parent_state' in validator_names
-    assert 'validate_child_state' in validator_names
+    assert "validate_parent_state" in validator_names
+    assert "validate_child_state" in validator_names
 
     instance = ChildModel(shared_text="ok", child_text="ok", parent_count=0)
     instance.validate()

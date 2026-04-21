@@ -1,7 +1,7 @@
 import pytest
 
-from src.google_cloud_datastore_odm.model import Model, model_validator
-from src.google_cloud_datastore_odm.properties import IntegerProperty, StringProperty
+from google_cloud_datastore_odm.model import Model, model_validator
+from google_cloud_datastore_odm.properties import IntegerProperty, StringProperty
 
 
 class UserWithValidator(Model):

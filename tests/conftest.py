@@ -5,9 +5,9 @@ from time import sleep
 import pytest
 import requests
 
-from src.google_cloud_datastore_odm.client import get_client
-from src.google_cloud_datastore_odm.model import Model
-from src.google_cloud_datastore_odm.properties import IntegerProperty, StringProperty
+from google_cloud_datastore_odm.client import get_client
+from google_cloud_datastore_odm.model import Model
+from google_cloud_datastore_odm.properties import IntegerProperty, StringProperty
 
 
 @pytest.fixture(autouse=True, scope="session")
@@ -47,9 +47,9 @@ def reset_datastore():
 
 
 class Constants:
-    STRING_DEFAULT = 'default'
+    STRING_DEFAULT = "default"
     INTEGER_DEFAULT = 0
-    STRING_FIXTURE = 'test'
+    STRING_FIXTURE = "test"
     INTEGER_FIXTURE = 1
 
 
@@ -65,10 +65,7 @@ class QueryTestModel(Model):
 
 @pytest.fixture
 def sample_dummy_doc() -> DummyTestModel:
-    return DummyTestModel(
-        test_string_field=Constants.STRING_FIXTURE, 
-        test_integer_field=Constants.INTEGER_FIXTURE
-    )
+    return DummyTestModel(test_string_field=Constants.STRING_FIXTURE, test_integer_field=Constants.INTEGER_FIXTURE)
 
 
 @pytest.fixture

@@ -54,14 +54,14 @@ jobs:
          env:
            DATASTORE_EMULATOR_HOST: localhost:10001
            GOOGLE_CLOUD_PROJECT: google-cloud-datastore-odm-test
-         run: uv run pytest --cov=src --cov-report=xml --cov-report=term-missing
+         run: uv run pytest --cov=google_cloud_datastore_odm --cov-report=xml --cov-report=term-missing
 
        - name: Generate Coverage Badge
-         if: matrix.python-version == '3.12' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+         if: matrix.python-version == '3.14' && github.event_name == 'push' && github.ref == 'refs/heads/main'
          run: uv run genbadge coverage -i coverage.xml -o coverage.svg
 
        - name: Commit Coverage Badge
-         if: matrix.python-version == '3.12' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+         if: matrix.python-version == '3.14' && github.event_name == 'push' && github.ref == 'refs/heads/main'
          uses: stefanzweifel/git-auto-commit-action@v7
          with:
            commit_message: "chore: auto-update coverage badge [skip ci]"
