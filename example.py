@@ -18,6 +18,7 @@ from src.google_cloud_datastore_odm import (
     Avg,
     BooleanProperty,
     BytesProperty,
+    ComputedProperty,
     Count,
     DateProperty,
     DateTimeProperty,
@@ -842,5 +843,36 @@ print("Saved logs with varying payload types.")
 for key in [log1.key, log2.key, log3.key]:
     fetched = EventLog.get(key)
     print(f"Fetched {fetched.event_name} -> Payload Type: {type(fetched.payload).__name__} -> {fetched.payload}")
+
+# ---------------------------------------------------------------------------
+# 25. Computed Data (ComputedProperty)
+# ---------------------------------------------------------------------------
+
+print("\n--- 25. Computed Data (ComputedProperty) ---")
+
+
+class Document(Model):
+    title = StringProperty(required=True)
+    content = StringProperty(required=True)
+    title_lower = ComputedProperty(lambda self: self.title.lower())
+
+    @ComputedProperty
+    def length(self):
+        return len(self.content)
+
+    @ComputedProperty(indexed=False)
+    def preview(self):
+        return self.content[:10] + "..." if len(self.content) > 10 else self.content
+
+
+doc = Document(title="My Big Plan", content="We need to build a massive spaceship.")
+doc.put()
+print("Saved Document.")
+print(f"  - Auto-computed lower title: {doc.title_lower}")
+print(f"  - Auto-computed length: {doc.length}")
+print(f"  - Auto-computed preview: {doc.preview}")
+
+docs = list(Document.query().filter(Document.title_lower == "my big plan").fetch())
+print(f"\nFound {len(docs)} document(s) via computed property query!")
 
 print("\nExample Run Complete!")

@@ -9,6 +9,7 @@ from src.google_cloud_datastore_odm.model import Model, field_validator
 from src.google_cloud_datastore_odm.properties import (
     BooleanProperty,
     BytesProperty,
+    ComputedProperty,
     DateProperty,
     DateTimeProperty,
     FloatProperty,
@@ -923,3 +924,44 @@ def test_generic_property():
     with pytest.raises(ValueError):
         class BadDynamicModel(Model):
             payload = GenericProperty(indexed=True, compressed=True)
+
+
+def test_computed_property():
+    class FileModel(Model):
+        name = StringProperty()
+        lower_name = ComputedProperty(lambda self: self.name.lower() if self.name else None)
+
+        @ComputedProperty
+        def size(self):
+            return len(self.name) if self.name else 0
+
+        @ComputedProperty(indexed=False)
+        def unindexed_size(self):
+            return len(self.name) if self.name else 0
+
+    instance = FileModel(name="DATa")
+
+    assert isinstance(FileModel.size, ComputedProperty)
+
+    assert instance.size == 4
+    assert instance.unindexed_size == 4
+    assert instance.lower_name == "data"
+
+    assert FileModel._properties['unindexed_size'].indexed is False
+
+    with pytest.raises(AttributeError):
+        instance.size = 5
+
+    prop_size = FileModel._properties['size']
+    prop_size._prepare_for_put(instance)
+    assert instance._values['size'] == 4
+
+    instance._is_projected = True
+    instance._values['size'] = 99
+    assert instance.size == 99
+
+    instance = FileModel(name="data", size=2)
+    assert instance.size == 4
+    with pytest.raises(AttributeError):
+        instance.size = 5
+

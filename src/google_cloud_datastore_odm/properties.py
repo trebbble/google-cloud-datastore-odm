@@ -933,3 +933,51 @@ class GenericProperty(Property):
             return dict(value)
 
         return value
+
+
+class ComputedProperty(GenericProperty):
+    """A Property whose value is dynamically computed by a developer-supplied function.
+
+    Cannot be assigned manually. The value is automatically evaluated when
+    the property is accessed, or immediately before saving to the Datastore.
+    """
+
+    def __init__(self, func: Any = None, **kwargs: Any):
+        super().__init__(**kwargs)
+        self.func = func
+
+    def __call__(self, func: Any) -> "ComputedProperty":
+        """Allows the property to be used as a decorator with arguments."""
+        self.func = func
+        return self
+
+    def __get__(self, instance: Any, owner: Any) -> Any:
+        if instance is None:
+            return self
+
+        # noinspection PyProtectedMember
+        if getattr(instance, '_is_projected', False) and self._python_name in instance._values:
+            # noinspection PyProtectedMember
+            return instance._values[self._python_name]
+
+        value = self.func(instance)
+        # noinspection PyProtectedMember
+        instance._values[self._python_name] = value
+        return value
+
+    def __set__(self, instance: Any, value: Any) -> None:
+        """
+        Allows the initial assignment so the ODM can hydrate fetched Datastore entities.
+        Once the property is loaded into memory, it locks down to prevent manual mutation.
+        """
+        # noinspection PyProtectedMember
+        if self._python_name in instance._values:
+            raise AttributeError(f"Cannot assign to ComputedProperty '{self._python_name}'")
+
+        # noinspection PyProtectedMember
+        instance._values[self._python_name] = value
+
+    def _prepare_for_put(self, instance: Any) -> None:
+        # noinspection PyProtectedMember
+        instance._values[self._python_name] = self.func(instance)
+        super()._prepare_for_put(instance)

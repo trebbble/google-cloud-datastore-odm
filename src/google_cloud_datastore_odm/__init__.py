@@ -3,6 +3,7 @@ from .model import field_validator as field_validator
 from .model import model_validator as model_validator
 from .properties import BooleanProperty as BooleanProperty
 from .properties import BytesProperty as BytesProperty
+from .properties import ComputedProperty as ComputedProperty
 from .properties import DateProperty as DateProperty
 from .properties import DateTimeProperty as DateTimeProperty
 from .properties import FloatProperty as FloatProperty
@@ -43,6 +44,7 @@ __all__ = [
     "TimeProperty",
     "GeoPtProperty",
     "GenericProperty",
+    "ComputedProperty",
     "and_",
     "AND",
     "or_",

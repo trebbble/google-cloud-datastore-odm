@@ -42,7 +42,8 @@ from src.google_cloud_datastore_odm import (
     TextProperty,
     TimeProperty,
     GeoPtProperty,
-    GenericProperty
+    GenericProperty,
+    ComputedProperty
 )
 
 class Address(Model):
@@ -75,7 +76,7 @@ class Article(Model):
     # Unindexed string (cannot be filtered on in queries)
     internal_notes = StringProperty(indexed=False)
     # Automatically unindexed, optionally compressed
-    body = TextProperty(compressed=True)
+    body = TextProperty(compressed=True, required=True)
     # Automatically unindexed, optionally compressed
     metadata: dict | list = JsonProperty()
     # Automatically unindexed, optionally compressed
@@ -86,6 +87,19 @@ class Article(Model):
     location = GeoPtProperty()
     # store any native datatype and optionally compress in case of bytes
     schemaless_log = GenericProperty(compressed=True)
+    
+    # computed properties
+    title_lower = ComputedProperty(lambda self: self.title.lower())
+
+    # Syntax 2: Standard decorator
+    @ComputedProperty
+    def length(self):
+        return len(self.body)
+
+    # Syntax 3: Decorator with property arguments
+    @ComputedProperty(indexed=False)
+    def preview(self):
+        return self.body[:10] + "..." if len(self.body) > 10 else self.body
 ```
 ## 3. Validation
 

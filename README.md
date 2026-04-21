@@ -73,7 +73,7 @@ https://trebbble.github.io/google-cloud-datastore-odm/
     - [x] StructuredProperty
     - [x] ~~LocalStructuredProperty~~ To be dropped. StructuredProperty and JsonProperty can accomodate sufficiently.
     - [x] GenericProperty
-    - [ ] ComputedProperty
+    - [x] ComputedProperty
   - [ ] Polymodel Support
 - [x] Model core API
   - [x] Datastore key expose and management
