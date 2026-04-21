@@ -177,8 +177,6 @@ def test_transaction_routing_arguments():
 
     with transaction(project="test-proj", database="test-db"):
         log = AuditLog(
-            project="test-proj",
-            database="test-db",
             action="Transfer: Alice to Bob",
             amount=30
         )
@@ -206,3 +204,24 @@ def test_transaction_namespace_isolation(reset_datastore):
     assert len(secure_results) == 2
     assert secure_results[0].key.namespace == "secure-ns"
     assert secure_results[0].key.project == "custom-txn-project"
+
+
+def test_transaction_bound_queries(reset_datastore):
+    """Ensure queries executed inside a transaction see the exact database snapshot."""
+    from tests.conftest import QueryTestModel
+
+    user1 = QueryTestModel(name="Alice", age=20)
+    user2 = QueryTestModel(name="Bob", age=30)
+    QueryTestModel.put_multi([user1, user2])
+
+    with transaction():
+        results = list(QueryTestModel.query().filter(QueryTestModel.age >= 20).fetch())
+        assert len(results) == 2
+
+        QueryTestModel(name="Charlie", age=40).put()
+
+        post_put_results = list(QueryTestModel.query().filter(QueryTestModel.age >= 20).fetch())
+        assert len(post_put_results) == 2
+
+    final_results = list(QueryTestModel.query().filter(QueryTestModel.age >= 20).fetch())
+    assert len(final_results) == 3

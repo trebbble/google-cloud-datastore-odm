@@ -502,3 +502,73 @@ customer_logs = list(
     .fetch()
 )
 ```
+
+## 11. Transactions
+Google Cloud Datastore utilizes optimistic concurrency to ensure ACID compliance. 
+The ODM provides two clean ways to manage transactions: a context manager and a robust retry decorator. 
+Both methods automatically route all operations through the active transaction without needing to pass `txn` arguments manually.
+
+⚠️ Transaction Architecture Rules
+The ODM uses Python contextvars to orchestrate transactions. You must follow these rules:
+
+- No Generators / Yielding: A transaction block must execute rapidly and completely. Do not yield data from inside a transaction block, as an abandoned generator will leave a dangling database transaction in memory. Always resolve queries eagerly inside the block (e.g., `list(query.fetch())`).
+- No Nested Transactions: Datastore does not support nested transactions.
+- Threading Isolation: Standard OS threads (`threading.Thread` or `ThreadPoolExecutor`) spun up inside a transaction block do not inherit the transaction context. Datastore calls inside those threads will execute outside the transaction.
+
+### Transaction Context Manager
+The `with transaction():` block executes exactly once. If the block finishes successfully, the queued mutations are committed. If an exception is raised, the transaction is discarded.
+
+```python
+from google_cloud_datastore_odm import Model, StringProperty, IntegerProperty, transaction
+
+class LedgerAccount(Model):
+    name = StringProperty()
+    balance = IntegerProperty(default=0)
+
+
+alice_key = LedgerAccount(name="Alice", balance=500).put()
+bob_key = LedgerAccount(name="Bob", balance=100).put()
+
+try:
+    with transaction():
+        a = LedgerAccount.get(alice_key)
+        b = LedgerAccount.get(bob_key)
+
+        a.balance -= 50
+        b.balance += 50
+
+        LedgerAccount.put_multi([a, b])
+    print("   -> Transfer of $50 successful.")
+except Exception as e:
+    print(f"   -> Transaction failed: {e}")
+```
+
+### Transactional Decorator (Recommended)
+Because Datastore uses optimistic concurrency, transactions will fail (throw an Aborted exception) if another process modifies your entities while your transaction is open.
+
+To recreate the automatic retry behavior of legacy NDB, use the @transactional decorator. It catches concurrency conflicts, applies an exponential backoff sleep, and retries the function automatically.
+
+```python
+from google_cloud_datastore_odm import Model, StringProperty, IntegerProperty, transactional
+
+class LedgerAccount(Model):
+    name = StringProperty()
+    balance = IntegerProperty(default=0)
+
+
+alice_key = LedgerAccount(name="Alice", balance=500).put()
+bob_key = LedgerAccount(name="Bob", balance=100).put()
+
+@transactional(retries=3)
+def transfer_funds(from_key, to_key, amount):
+    sender = LedgerAccount.get(from_key)
+    receiver = LedgerAccount.get(to_key)
+    
+    sender.balance -= amount
+    receiver.balance += amount
+    
+    sender.put()
+    receiver.put()
+
+transfer_funds(alice_key, bob_key, 50)
+```

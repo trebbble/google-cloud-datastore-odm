@@ -101,7 +101,7 @@ https://trebbble.github.io/google-cloud-datastore-odm/
 - [x] Projection queries
 - [x] Distinct queries
 - [x] .get() queries for first or None
-- [ ] Transaction-bound queries
+- [x] Transaction-bound queries
 - [x] Aggregations
   - [x] Count
   - [x] Sum
@@ -110,7 +110,7 @@ https://trebbble.github.io/google-cloud-datastore-odm/
 - [x] Warnings for queries on unindexed properties (for normal filters or even projections)
 
 ### Persistence & Operations
-- [ ] Transactions
+- [x] Transactions
 - [ ] Cache
 
 

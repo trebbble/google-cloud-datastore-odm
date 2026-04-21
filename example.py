@@ -39,6 +39,8 @@ from src.google_cloud_datastore_odm import (
     field_validator,
     model_validator,
     or_,
+    transaction,
+    transactional,
 )
 
 load_dotenv()
@@ -881,5 +883,63 @@ print(f"  - Auto-computed preview: {doc.preview}")
 
 docs = list(Document.query().filter(Document.title_lower == "my big plan").fetch())
 print(f"\nFound {len(docs)} document(s) via computed property query!")
+
+# ---------------------------------------------------------------------------
+# 26. Transactions & Concurrency
+# ---------------------------------------------------------------------------
+print("\n--- 26. Transactions & Concurrency ---")
+
+
+class LedgerAccount(Model):
+    name = StringProperty()
+    balance = IntegerProperty(default=0)
+
+
+# Seed Accounts
+alice_key = LedgerAccount(name="Alice", balance=500).put()
+bob_key = LedgerAccount(name="Bob", balance=100).put()
+
+print("1. Context Manager (Single Attempt)")
+try:
+    with transaction():
+        a = LedgerAccount.get(alice_key)
+        b = LedgerAccount.get(bob_key)
+
+        a.balance -= 50
+        b.balance += 50
+
+        LedgerAccount.put_multi([a, b])
+    print("   -> Transfer of $50 successful.")
+except Exception as e:
+    print(f"   -> Transaction failed: {e}")
+
+
+print("\n2. Decorator (Automatic Retries on Conflict)")
+
+
+# This function will automatically retry up to 5 times if
+# another server modifies Alice or Bob at the exact same time.
+@transactional(retries=5)
+def safe_transfer(from_key, to_key, amount):
+    sender = LedgerAccount.get(from_key)
+    receiver = LedgerAccount.get(to_key)
+
+    if sender.balance < amount:
+        raise ValueError("Insufficient funds!")
+
+    sender.balance -= amount
+    receiver.balance += amount
+
+    sender.put()
+    receiver.put()
+    return f"Transferred ${amount} safely!"
+
+
+success_msg = safe_transfer(alice_key, bob_key, 100)
+print(f"   -> {success_msg}")
+
+final_alice = LedgerAccount.get(alice_key)
+final_bob = LedgerAccount.get(bob_key)
+print(f"   -> Final Balances: Alice=${final_alice.balance}, Bob=${final_bob.balance}")
 
 print("\nExample Run Complete!")

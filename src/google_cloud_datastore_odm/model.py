@@ -179,6 +179,34 @@ class Model(metaclass=ModelMeta):
 
         return default
 
+    @classmethod
+    def _resolve_routing(
+            cls,
+            project: Optional[str] = None,
+            database: Optional[str] = None
+    ) -> Tuple[Optional[str], Optional[str]]:
+        """
+        Resolves the correct project and database in this strict order:
+        1. Explicit kwargs passed to the method
+        2. The active Datastore Transaction (if we are inside a with block)
+        3. The Model's Meta class definitions
+        """
+        resolved_proj = project
+        resolved_db = database
+
+        if resolved_proj is None or resolved_db is None:
+            txn = get_current_transaction()
+            if txn:
+                # noinspection PyProtectedMember
+                txn_client = txn._client
+                resolved_proj = resolved_proj or txn_client.project
+                resolved_db = resolved_db or txn_client.database
+
+        resolved_proj = resolved_proj or cls._project
+        resolved_db = resolved_db or cls._database
+
+        return resolved_proj, resolved_db
+
     def __init__(self, **kwargs: Any) -> None:
         """Initialize a new model instance.
 
@@ -216,8 +244,7 @@ class Model(metaclass=ModelMeta):
         else:
             self.key = key
             if self.key is None and any(x is not None for x in (parent, project, database, namespace)):
-                resolved_proj = project if project is not None else self._project
-                resolved_db = database if database is not None else self._database
+                resolved_proj, resolved_db = self._resolve_routing(project, database)
                 resolved_ns = namespace if namespace is not None else self._namespace
 
                 key_kwargs = {}
@@ -431,8 +458,7 @@ class Model(metaclass=ModelMeta):
         if size <= 0:
             raise ValueError("Number of IDs to allocate must be greater than 0.")
 
-        resolved_proj = project if project is not None else cls._project
-        resolved_db = database if database is not None else cls._database
+        resolved_proj, resolved_db = cls._resolve_routing(project, database)
         client = cls.client(project=resolved_proj, database=resolved_db)
 
         kwargs = {}
@@ -486,7 +512,8 @@ class Model(metaclass=ModelMeta):
             if self._namespace:
                 kwargs["namespace"] = self._namespace
 
-            client = self.client(project=self._project, database=self._database)
+            resolved_proj, resolved_db = self._resolve_routing()
+            client = self.client(project=resolved_proj, database=resolved_db)
             self.key = client.key(self._kind, **kwargs)
 
     @classmethod
@@ -519,8 +546,7 @@ class Model(metaclass=ModelMeta):
         if parent:
             kwargs["parent"] = parent
 
-        resolved_proj = project if project is not None else cls._project
-        resolved_db = database if database is not None else cls._database
+        resolved_proj, resolved_db = cls._resolve_routing(project, database)
 
         resolved_ns = namespace if namespace is not None else cls._namespace
         if resolved_ns:
@@ -664,8 +690,7 @@ class Model(metaclass=ModelMeta):
         Returns:
             Query: An ODM Query object ready for filtering and fetching.
         """
-        resolved_proj = project if project is not None else cls._project
-        resolved_db = database if database is not None else cls._database
+        resolved_proj, resolved_db = cls._resolve_routing(project, database)
         resolved_ns = namespace if namespace is not None else cls._namespace
 
         return Query(cls, project=resolved_proj, database=resolved_db, namespace=resolved_ns)
