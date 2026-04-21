@@ -8,6 +8,9 @@ This module is structured into three layers:
 """
 
 from typing import TYPE_CHECKING, Any, Dict, Generator, List, Optional, Union
+import warnings
+import inspect
+import os
 
 from google.cloud.datastore import query
 from google.cloud.datastore.aggregation import AvgAggregation as Avg
@@ -117,6 +120,63 @@ class Query:
                 self._orders.append(OrderNode(arg[1:] if is_desc else arg, is_desc))
         return self
 
+    def _warn_for_unindexed_properties(self) -> None:
+        """Scans the translated query state and warns if unindexed properties are used."""
+        # noinspection PyProtectedMember
+        model_properties = self.model_cls._properties
+        if not model_properties:
+            return
+
+        used_datastore_names = set()
+
+        def extract_filter_names(node: Node):
+            if isinstance(node, FilterNode):
+                used_datastore_names.add(node.name)
+            elif isinstance(node, CompositeNode):
+                for f in node.filters:
+                    extract_filter_names(f)
+
+        for f_node in self._filters:
+            extract_filter_names(f_node)
+
+        for o_node in self._orders:
+            used_datastore_names.add(o_node.name)
+
+        for p in self._projection + self._distinct_on:
+            if hasattr(p, 'datastore_name'):
+                used_datastore_names.add(p.datastore_name)
+            elif isinstance(p, str):
+                used_datastore_names.add(p)
+
+        unindexed_found = []
+        for prop in model_properties.values():
+            if prop.datastore_name in used_datastore_names and not prop.indexed:
+                # noinspection PyProtectedMember
+                unindexed_found.append(prop._python_name)
+
+        if unindexed_found:
+            dynamic_stacklevel = 1
+            try:
+                frame = inspect.currentframe()
+                odm_dir = os.path.dirname(__file__)
+
+                while frame:
+                    if odm_dir not in frame.f_code.co_filename:
+                        break
+                    dynamic_stacklevel += 1
+                    frame = frame.f_back
+            except Exception:  # noqa
+                dynamic_stacklevel = 5
+
+            warnings.warn(
+                f"This query relies on unindexed properties of model "
+                f"'{self.model_cls.kind()}': {unindexed_found}. "
+                f"Datastore does not maintain indexes for these fields. "
+                f"This will likely result in zero results or an empty projection.",
+                UserWarning,
+                stacklevel=dynamic_stacklevel
+            )
+
     def _translate(self, node: Node) -> Union[query.PropertyFilter, query.And, query.Or]:
         """Recursive translation from ODM Nodes to SDK Query objects."""
         if isinstance(node, FilterNode):
@@ -130,6 +190,8 @@ class Query:
 
     def _build(self) -> query.Query:
         """Helper to prepare the native SDK Query object."""
+        self._warn_for_unindexed_properties()
+
         client = get_client(self.project, self.database)
         _query = client.query(kind=self.model_cls.kind(), namespace=self.namespace)
 
@@ -169,8 +231,18 @@ class Query:
 
         is_projected = bool(self._projection)
 
-        for entity in native_query.fetch(limit=limit):
-            yield self._hydrate_entity(entity=entity, keys_only=self._keys_only, is_projected=is_projected)
+        def _generator():
+            for entity in native_query.fetch(limit=limit):
+                yield self._hydrate_entity(
+                    entity=entity,
+                    keys_only=self._keys_only,
+                    is_projected=is_projected
+                )
+
+        return _generator()
+        #
+        # for entity in native_query.fetch(limit=limit):
+        #     yield self._hydrate_entity(entity=entity, keys_only=self._keys_only, is_projected=is_projected)
 
     def fetch_page(
             self,

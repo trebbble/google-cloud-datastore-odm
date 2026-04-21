@@ -619,6 +619,17 @@ stats = base_query.aggregate(
 print(f"Total Published Articles: {stats['total_articles']}")
 print(f"Total Words Written: {stats['total_words']}")
 print(f"Average Words per Article: {stats['average_words']:.1f}")
+
+
+# this will raise a UserWarning as it uses unindexed property in filters
+# while datastore will accept it but fetch nothing
+article_with_internal_notes = Article.query().filter(Article.internal_notes != "").fetch()
+print(f"Articles with internal notes: {len(list(article_with_internal_notes))}")
+
+# same article is fetche normally by id
+article_with_internal_notes = Article.get_by_id("my-first-article")
+print(f"Article with internal notes: {article_with_internal_notes}")
+
 # ---------------------------------------------------------
 # Passthrough queries
 # ---------------------------------------------------------
@@ -701,8 +712,6 @@ while has_more:
     for article in page:
         print(f"{article.author} - {article.title}")
 
-print("\nExample Run Complete!")
-
 
 # ---------------------------------------------------------------------------
 # 20. Relational Data (KeyProperty)
@@ -730,8 +739,6 @@ for a in my_articles:
     print(f"  -> {a.title} (Author Key matched perfectly!)")
     author = Article.get(a.author_key)
     print(f"  - {author}")
-
-print("\nExample Run Complete!")
 
 # ---------------------------------------------------------------------------
 # 21. Embedded Entities (StructuredProperty)

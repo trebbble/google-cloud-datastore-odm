@@ -1,5 +1,6 @@
 from unittest.mock import MagicMock, patch
 
+import warnings
 import pytest
 from google.cloud.datastore import Key, query
 from google.cloud.datastore.aggregation import AggregationQuery
@@ -457,3 +458,46 @@ def test_query_aggregate_no_results_mock():
         stats = q.aggregate(total=Count())
 
         assert stats == {"total": None}
+
+
+def test_query_unindexed_warnings():
+    """Ensure queries using unindexed properties emit a UserWarning during _build()."""
+    class SearchModel(Model):
+        title = StringProperty()
+        body = StringProperty(indexed=False)
+
+    q_filter = SearchModel.query().filter(SearchModel.body == "hello")
+    with pytest.warns(UserWarning) as e:
+        q_filter._build()
+
+    q_order = SearchModel.query().order("-body")
+    with pytest.warns(UserWarning) as e:
+        q_order._build()
+
+    q_proj = SearchModel.query().projection(SearchModel.body)
+    with pytest.warns(UserWarning) as e:
+        q_proj._build()
+
+    q_composite = SearchModel.query().filter(OR(SearchModel.title == "A", SearchModel.body == "B"))
+    with pytest.warns(UserWarning) as e:
+        q_composite._build()
+
+    q_safe = SearchModel.query().filter(SearchModel.title == "Safe").order("-title").projection("title")
+    with warnings.catch_warnings() as e:
+        warnings.simplefilter("error")
+        q_safe._build()
+
+
+def test_query_unindexed_warning_stacklevel_fallback():
+    """Ensure the dynamic stacklevel safely falls back to 5 if frame inspection fails."""
+
+    class SearchModel(Model):
+        body = StringProperty(indexed=False)
+
+    q = SearchModel.query().filter(SearchModel.body == "hello")
+
+    patch_target = "src.google_cloud_datastore_odm.query.inspect.currentframe"
+
+    with patch(patch_target, side_effect=Exception("Simulated catastrophic frame failure")):
+        with pytest.warns(UserWarning):
+            q._build()
