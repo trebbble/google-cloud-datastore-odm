@@ -74,7 +74,7 @@ https://trebbble.github.io/google-cloud-datastore-odm/
     - [x] ~~LocalStructuredProperty~~ To be dropped. StructuredProperty and JsonProperty can accomodate sufficiently.
     - [x] GenericProperty
     - [x] ComputedProperty
-  - [ ] Polymodel Support
+  - [ ] Polymodel Support (TBD)
 - [x] Model core API
   - [x] Datastore key expose and management
   - [x] Key allocation helpers
@@ -118,7 +118,6 @@ https://trebbble.github.io/google-cloud-datastore-odm/
 - [x] Model schema introspection API
 - [x] Field metadata exposure
 - [x] Optional index declarations at the model level
-- [ ] Index introspection (where possible)
 
 ### Async Support
 - [ ] Async model API operations
