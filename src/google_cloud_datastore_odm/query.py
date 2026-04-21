@@ -240,9 +240,6 @@ class Query:
                 )
 
         return _generator()
-        #
-        # for entity in native_query.fetch(limit=limit):
-        #     yield self._hydrate_entity(entity=entity, keys_only=self._keys_only, is_projected=is_projected)
 
     def fetch_page(
             self,

@@ -14,6 +14,7 @@ from google.cloud import datastore
 from .client import get_client
 from .properties import Property
 from .query import Query
+from .transaction import get_current_transaction
 
 MODEL_VALIDATOR_ATTR = "__model_validator__"
 FIELD_VALIDATOR_ATTR = "__field_validator__"
@@ -622,8 +623,11 @@ class Model(metaclass=ModelMeta):
             Optional[Model]: The hydrated model instance, or None if not found.
         """
         cls._pre_get_hook(key)
+
         client = cls.client(project=key.project, database=key.database)
-        entity = client.get(key)
+        txn = get_current_transaction()
+
+        entity = client.get(key, transaction=txn)
 
         instance = cls.from_entity(entity) if entity else None
         cls._post_get_hook(key, instance)
@@ -699,9 +703,13 @@ class Model(metaclass=ModelMeta):
         self._check_completeness()
         self.validate()
         self._ensure_key()
-        self._pre_put_hook()
 
-        client = self.client(project=self.key.project, database=self.key.database)
+        txn = get_current_transaction()
+
+        if txn and self.key.is_partial:
+            self.allocate_key()
+
+        self._pre_put_hook()
 
         unindexed_names = set(self._unindexed_datastore_names)
 
@@ -731,8 +739,12 @@ class Model(metaclass=ModelMeta):
                     # noinspection PyProtectedMember
                     entity[prop.datastore_name] = prop._to_base_type(value)
 
-        client.put(entity)
-        self.key = entity.key
+        if txn:
+            txn.put(entity)
+        else:
+            client = self.client(project=self.key.project, database=self.key.database)
+            client.put(entity)
+            self.key = entity.key
 
         self._post_put_hook()
 
@@ -750,7 +762,14 @@ class Model(metaclass=ModelMeta):
             raise ValueError("Cannot delete an entity that does not have a key.")
 
         self._pre_delete_hook(self.key)
-        self.client(project=self.key.project, database=self.key.database).delete(self.key)
+
+        txn = get_current_transaction()
+        if txn:
+            executor = txn
+        else:
+            executor = self.client(project=self.key.project, database=self.key.database)
+
+        executor.delete(self.key)
         self._post_delete_hook(self.key)
 
     @classmethod
@@ -778,8 +797,9 @@ class Model(metaclass=ModelMeta):
             cls._pre_get_hook(key)
 
         client = cls.client(project=project, database=database)
+        txn = get_current_transaction()
 
-        entities = client.get_multi(keys)
+        entities = client.get_multi(keys, transaction=txn)
         entity_map = {e.key: e for e in entities}
 
         instances = []
@@ -818,7 +838,25 @@ class Model(metaclass=ModelMeta):
         if any(inst.key.project != project or inst.key.database != database for inst in instances):
             raise ValueError("All instances in a put_multi operation must belong to the same project and database.")
 
-        client = cls.client(project=project, database=database)
+        txn = get_current_transaction()
+
+        if txn:
+            allocation_groups = defaultdict(list)
+            for inst in instances:
+                if inst.key.is_partial:
+                    allocation_groups[(inst.key.parent, inst.key.namespace)].append(inst)
+
+            for (parent, namespace), group_instances in allocation_groups.items():
+                allocated_keys = cls.allocate_ids(
+                    size=len(group_instances),
+                    parent=parent,
+                    project=project,
+                    database=database,
+                    namespace=namespace
+                )
+                for inst, alloc_key in zip(group_instances, allocated_keys):
+                    inst.key = alloc_key
+
         entities_to_put = []
 
         # Use the pre-computed schema-level index exclusions for maximum speed
@@ -849,10 +887,17 @@ class Model(metaclass=ModelMeta):
 
             entities_to_put.append(entity)
 
-        client.put_multi(entities_to_put)
+        if txn:
+            for entity in entities_to_put:
+                txn.put(entity)
+        else:
+            client = cls.client(project=project, database=database)
+            client.put_multi(entities_to_put)
 
-        for instance, entity in zip(instances, entities_to_put):
-            instance.key = entity.key
+            for instance, entity in zip(instances, entities_to_put):
+                instance.key = entity.key
+
+        for instance in instances:
             instance._post_put_hook()
 
         return [instance.key for instance in instances]
@@ -875,7 +920,13 @@ class Model(metaclass=ModelMeta):
         for key in keys:
             cls._pre_delete_hook(key)
 
-        cls.client(project=project, database=database).delete_multi(keys)
+        txn = get_current_transaction()
+        if txn:
+            for key in keys:
+                txn.delete(key)
+        else:
+            client = cls.client(project=project, database=database)
+            client.delete_multi(keys)
 
         for key in keys:
             cls._post_delete_hook(key)
