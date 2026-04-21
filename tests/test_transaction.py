@@ -105,7 +105,7 @@ def test_transactional_generator_ban():
             yield 1
 
 
-@patch("src.google_cloud_datastore_odm.transaction.time.sleep")
+@patch("google_cloud_datastore_odm.transaction.time.sleep")
 def test_transactional_retry_success(mock_sleep, reset_datastore):
     """Ensure the decorator retries on Aborted and eventually succeeds."""
     attempt_tracker = {"count": 0}
@@ -131,7 +131,7 @@ def test_transactional_retry_success(mock_sleep, reset_datastore):
     assert QueryTestModel.query().filter(QueryTestModel.name == "RetryUser").get() is not None
 
 
-@patch("src.google_cloud_datastore_odm.transaction.time.sleep")
+@patch("google_cloud_datastore_odm.transaction.time.sleep")
 def test_transactional_retry_exhaustion(mock_sleep):
     """Ensure the decorator gives up and raises the exception after max retries."""
     mock_func = MagicMock(side_effect=Aborted("Constant Collision"))

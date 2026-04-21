@@ -481,7 +481,7 @@ def test_query_unindexed_warning_stacklevel_fallback():
 
     q = SearchModel.query().filter(SearchModel.body == "hello")
 
-    patch_target = "src.google_cloud_datastore_odm.query.inspect.currentframe"
+    patch_target = "google_cloud_datastore_odm.query.inspect.currentframe"
 
     with patch(patch_target, side_effect=Exception("Simulated catastrophic frame failure")):
         with pytest.warns(UserWarning):
