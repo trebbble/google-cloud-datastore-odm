@@ -105,6 +105,15 @@ def test_transactional_generator_ban():
             yield 1
 
 
+def test_transactional_bad_retries():
+    """Ensure the decorator actively refuses to wrap generator functions."""
+    with pytest.raises(ValueError):
+
+        @transactional(retries=-1)
+        def bad_generator_txn():
+            pass
+
+
 @patch("google_cloud_datastore_odm.transaction.time.sleep")
 def test_transactional_retry_success(mock_sleep, reset_datastore):
     """Ensure the decorator retries on Aborted and eventually succeeds."""
