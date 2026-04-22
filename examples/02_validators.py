@@ -5,10 +5,10 @@ To run this locally:
 """
 
 from pathlib import Path
+
 from dotenv import load_dotenv
-from google_cloud_datastore_odm import (
-    Model, StringProperty, IntegerProperty, field_validator, model_validator
-)
+
+from google_cloud_datastore_odm import IntegerProperty, Model, StringProperty, field_validator, model_validator
 
 load_dotenv()
 print("\n" + "=" * 60)

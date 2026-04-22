@@ -5,14 +5,29 @@ To run this locally:
 """
 
 import datetime
-from dotenv import load_dotenv
 from pathlib import Path
+
+from dotenv import load_dotenv
 from google.cloud.datastore.helpers import GeoPoint
+
 from google_cloud_datastore_odm import (
-    Model, BooleanProperty, BytesProperty, ComputedProperty, DateProperty,
-    DateTimeProperty, FloatProperty, GenericProperty, GeoPtProperty,
-    IntegerProperty, JsonProperty, KeyProperty, PickleProperty,
-    StringProperty, StructuredProperty, TextProperty, TimeProperty
+    BooleanProperty,
+    BytesProperty,
+    ComputedProperty,
+    DateProperty,
+    DateTimeProperty,
+    FloatProperty,
+    GenericProperty,
+    GeoPtProperty,
+    IntegerProperty,
+    JsonProperty,
+    KeyProperty,
+    Model,
+    PickleProperty,
+    StringProperty,
+    StructuredProperty,
+    TextProperty,
+    TimeProperty,
 )
 
 load_dotenv()

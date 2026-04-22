@@ -6,8 +6,10 @@ To run this locally:
 
 import json
 from pathlib import Path
+
 from dotenv import load_dotenv
-from google_cloud_datastore_odm import Model, StringProperty, IntegerProperty
+
+from google_cloud_datastore_odm import IntegerProperty, Model, StringProperty
 
 load_dotenv()
 print("\n" + "=" * 60)

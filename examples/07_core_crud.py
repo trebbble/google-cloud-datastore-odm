@@ -6,8 +6,10 @@ To run this locally:
 
 import datetime
 from pathlib import Path
+
 from dotenv import load_dotenv
-from google_cloud_datastore_odm import Model, StringProperty, DateTimeProperty
+
+from google_cloud_datastore_odm import DateTimeProperty, Model, StringProperty
 
 load_dotenv()
 print("\n" + "=" * 60)

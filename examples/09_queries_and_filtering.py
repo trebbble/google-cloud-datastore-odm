@@ -5,11 +5,10 @@ To run this locally:
 """
 
 from pathlib import Path
+
 from dotenv import load_dotenv
-from google_cloud_datastore_odm import (
-    Model, StringProperty, IntegerProperty, StructuredProperty,
-    AND, OR, and_, or_
-)
+
+from google_cloud_datastore_odm import AND, OR, IntegerProperty, Model, StringProperty, StructuredProperty, and_, or_
 
 load_dotenv()
 print("\n" + "=" * 60)

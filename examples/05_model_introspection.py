@@ -6,8 +6,10 @@ To run this locally:
 
 import json
 from pathlib import Path
+
 from dotenv import load_dotenv
-from google_cloud_datastore_odm import Model, StringProperty, IntegerProperty, BooleanProperty
+
+from google_cloud_datastore_odm import BooleanProperty, IntegerProperty, Model, StringProperty
 
 load_dotenv()
 print("\n" + "=" * 60)
@@ -22,7 +24,7 @@ class UserAccount(Model):
     tags = StringProperty(repeated=True)
 
 
-print(f"[Introspection] Python Class Name: UserAccount")
+print("[Introspection] Python Class Name: UserAccount")
 print(f"[Introspection] Datastore Kind: {UserAccount.kind()}")
 
 print("\n--- Full Schema Output ---")

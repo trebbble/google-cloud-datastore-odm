@@ -5,8 +5,10 @@ To run this locally:
 """
 
 from pathlib import Path
+
 from dotenv import load_dotenv
-from google_cloud_datastore_odm import Model, StringProperty, IntegerProperty, Count, Sum, Avg
+
+from google_cloud_datastore_odm import Avg, Count, IntegerProperty, Model, StringProperty, Sum
 
 load_dotenv()
 print("\n" + "=" * 60)

@@ -5,7 +5,9 @@ To run this locally:
 """
 
 from pathlib import Path
+
 from dotenv import load_dotenv
+
 from google_cloud_datastore_odm import Model, StringProperty
 
 load_dotenv()

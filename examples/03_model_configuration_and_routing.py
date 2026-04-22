@@ -5,7 +5,9 @@ To run this locally:
 """
 
 from pathlib import Path
+
 from dotenv import load_dotenv
+
 from google_cloud_datastore_odm import Model, StringProperty
 
 load_dotenv()
@@ -34,7 +36,7 @@ print("--- Default Meta Routing ---")
 log_default = SystemLog(event="Startup", user_id="system")
 log_default.put()
 
-print(f"[SystemLog] Saved using defaults from Meta config:")
+print("[SystemLog] Saved using defaults from Meta config:")
 print(f"  - Project: {log_default.key.project}")
 print(f"  - Database: {log_default.key.database}")
 print(f"  - Namespace: {log_default.key.namespace}")
@@ -50,7 +52,7 @@ log_tenant = SystemLog(
 )
 log_tenant.put()
 
-print(f"[SystemLog] Saved using explicit kwargs to override ad-hoc:")
+print("[SystemLog] Saved using explicit kwargs to override ad-hoc:")
 print(f"  - Project: {log_tenant.key.project}")
 print(f"  - Database: {log_tenant.key.database}")
 print(f"  - Namespace: {log_tenant.key.namespace}")
