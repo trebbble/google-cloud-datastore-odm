@@ -1,6 +1,6 @@
 [project]
 site_name = "Google Cloud Datastore ODM"
-site_description = "A modern, strictly-typed ODM for Google Cloud Datastore."
+site_description = "A modern, fully-typed Python ODM for Google Cloud Datastore."
 repo_url = "https://github.com/trebbble/google-cloud-datastore-odm"
 
 nav = [
