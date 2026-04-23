@@ -277,16 +277,41 @@ class KeyProperty(Property):
         ```
     """
 
-    def __init__(self, kind: str | Any | None = None, **kwargs: Any):
+    def __init__(
+            self,
+            kind: str | Any | None = None,
+            *,
+            name: str | None = None,
+            indexed: bool = True,
+            repeated: bool = False,
+            required: bool = False,
+            default: Any = None,
+            choices: list | None = None,
+            validators: list[Callable] | None = None,
+    ):
         """Initialize a new KeyProperty.
 
         Args:
             kind (str | Any | None): A string or Model class to restrict
                 the allowed keys. If provided, assigning a key of a different
                 kind will raise a ValueError.
-            **kwargs: Additional base property arguments.
+            name (str | None): The Datastore column name. Defaults to Python attribute name.
+            indexed (bool): Whether the Datastore should index this property.
+            repeated (bool): If True, expects an iterable of keys.
+            required (bool): If True, assigning `None` will raise a ValueError.
+            default (Any): The default value or a zero-argument callable to generate one.
+            choices (list | None): An optional list of allowed values.
+            validators (list[Callable] | None): A list of custom validation functions.
         """
-        super().__init__(**kwargs)
+        super().__init__(
+            name=name,
+            indexed=indexed,
+            repeated=repeated,
+            required=required,
+            default=default,
+            choices=choices,
+            validators=validators
+        )
         self._model = kind
 
     @property
@@ -333,14 +358,44 @@ class BytesProperty(Property):
         ```
     """
 
-    def __init__(self, compressed: bool = False, **kwargs: Any):
-        kwargs.setdefault("indexed", False)
+    def __init__(
+            self,
+            compressed: bool = False,
+            *,
+            name: str | None = None,
+            indexed: bool | None = None,
+            repeated: bool = False,
+            required: bool = False,
+            default: Any = None,
+            choices: list | None = None,
+            validators: list[Callable] | None = None,
+    ):
+        """Initialize a new BytesProperty.
 
-        if compressed and kwargs.get("indexed"):
+        Args:
+            compressed (bool): If True, automatically compress the bytes using zlib.
+            name (str | None): The Datastore column name. Defaults to Python attribute name.
+            indexed (bool | None): Defaults to False in order to bypass 1500-byte limits.
+            repeated (bool): If True, expects an iterable of byte objects.
+            required (bool): If True, assigning `None` will raise a ValueError.
+            default (Any): The default value or a zero-argument callable to generate one.
+            choices (list | None): An optional list of allowed values.
+            validators (list[Callable] | None): A list of custom validation functions.
+        """
+        actual_indexed = indexed if indexed is not None else False
+
+        if compressed and actual_indexed:
             raise ValueError("A BytesProperty cannot be both compressed and indexed.")
 
-        kwargs["indexed"] = False
-        super().__init__(**kwargs)
+        super().__init__(
+            name=name,
+            indexed=actual_indexed,
+            repeated=repeated,
+            required=required,
+            default=default,
+            choices=choices,
+            validators=validators
+        )
         self.compressed = compressed
 
     def _validate_type(self, value: Any) -> Any:
@@ -382,14 +437,44 @@ class PickleProperty(Property):
         ```
     """
 
-    def __init__(self, compressed: bool = False, **kwargs: Any):
-        kwargs.setdefault("indexed", False)
+    def __init__(
+            self,
+            compressed: bool = False,
+            *,
+            name: str | None = None,
+            indexed: bool | None = None,
+            repeated: bool = False,
+            required: bool = False,
+            default: Any = None,
+            choices: list | None = None,
+            validators: list[Callable] | None = None,
+    ):
+        """Initialize a new PickleProperty.
 
-        if compressed and kwargs.get("indexed"):
+        Args:
+            compressed (bool): If True, automatically compress the pickled bytes using zlib.
+            name (str | None): The Datastore column name. Defaults to Python attribute name.
+            indexed (bool | None): Defaults to False in order to bypass 1500-byte limits.
+            repeated (bool): If True, expects an iterable of Python objects.
+            required (bool): If True, assigning `None` will raise a ValueError.
+            default (Any): The default value or a zero-argument callable to generate one.
+            choices (list | None): An optional list of allowed values.
+            validators (list[Callable] | None): A list of custom validation functions.
+        """
+        actual_indexed = indexed if indexed is not None else False
+
+        if compressed and actual_indexed:
             raise ValueError("A PickleProperty cannot be both compressed and indexed.")
 
-        kwargs["indexed"] = False
-        super().__init__(**kwargs)
+        super().__init__(
+            name=name,
+            indexed=actual_indexed,
+            repeated=repeated,
+            required=required,
+            default=default,
+            choices=choices,
+            validators=validators
+        )
         self.compressed = compressed
 
     def _to_base_type(self, value: Any) -> Any:
@@ -498,12 +583,42 @@ class TextProperty(StringProperty):
         ```
     """
 
-    def __init__(self, compressed: bool = False, **kwargs: Any):
-        if kwargs.get("indexed"):
+    def __init__(
+            self,
+            compressed: bool = False,
+            *,
+            name: str | None = None,
+            indexed: bool | None = False,
+            repeated: bool = False,
+            required: bool = False,
+            default: Any = None,
+            choices: list | None = None,
+            validators: list[Callable] | None = None,
+    ):
+        """Initialize a new TextProperty.
+
+        Args:
+            compressed (bool): If True, automatically compress the text string using zlib.
+            name (str | None): The Datastore column name. Defaults to Python attribute name.
+            indexed (bool | None): Text properties cannot be indexed. This must be False or None.
+            repeated (bool): If True, expects an iterable of strings.
+            required (bool): If True, assigning `None` will raise a ValueError.
+            default (Any): The default value or a zero-argument callable to generate one.
+            choices (list | None): An optional list of allowed values.
+            validators (list[Callable] | None): A list of custom validation functions.
+        """
+        if indexed:
             raise ValueError("TextProperty cannot be indexed. Use StringProperty instead.")
 
-        kwargs["indexed"] = False
-        super().__init__(**kwargs)
+        super().__init__(
+            name=name,
+            indexed=indexed,
+            repeated=repeated,
+            required=required,
+            default=default,
+            choices=choices,
+            validators=validators
+        )
         self.compressed = compressed
 
     def _to_base_type(self, value: Any) -> Any:
@@ -536,14 +651,44 @@ class JsonProperty(Property):
         ```
     """
 
-    def __init__(self, compressed: bool = False, **kwargs: Any):
-        kwargs.setdefault("indexed", False)
+    def __init__(
+            self,
+            compressed: bool = False,
+            *,
+            name: str | None = None,
+            indexed: bool | None = None,
+            repeated: bool = False,
+            required: bool = False,
+            default: Any = None,
+            choices: list | None = None,
+            validators: list[Callable] | None = None,
+    ):
+        """Initialize a new JsonProperty.
 
-        if compressed and kwargs.get("indexed"):
+        Args:
+            compressed (bool): If True, automatically compress the JSON string using zlib.
+            name (str | None): The Datastore column name. Defaults to Python attribute name.
+            indexed (bool | None): Defaults to False in order to prevent index explosions.
+            repeated (bool): If True, expects an iterable of JSON-serializable objects.
+            required (bool): If True, assigning `None` will raise a ValueError.
+            default (Any): The default value or a zero-argument callable to generate one.
+            choices (list | None): An optional list of allowed values.
+            validators (list[Callable] | None): A list of custom validation functions.
+        """
+        actual_indexed = indexed if indexed is not None else False
+
+        if compressed and actual_indexed:
             raise ValueError("A JsonProperty cannot be both compressed and indexed.")
 
-        kwargs["indexed"] = False
-        super().__init__(**kwargs)
+        super().__init__(
+            name=name,
+            indexed=actual_indexed,
+            repeated=repeated,
+            required=required,
+            default=default,
+            choices=choices,
+            validators=validators
+        )
         self.compressed = compressed
 
     def _validate_type(self, value: Any) -> Any:
@@ -610,7 +755,13 @@ class DateTimeProperty(Property):
             auto_now: bool = False,
             auto_now_add: bool = False,
             tzinfo: datetime.tzinfo | None = None,
-            **kwargs: Any
+            name: str | None = None,
+            indexed: bool = True,
+            repeated: bool = False,
+            required: bool = False,
+            default: Any = None,
+            choices: list | None = None,
+            validators: list[Callable] | None = None,
     ):
         """Initialize a new DateTimeProperty.
 
@@ -618,16 +769,30 @@ class DateTimeProperty(Property):
             auto_now (bool): If True, automatically set to the current time on every put().
             auto_now_add (bool): If True, automatically set to the current time when first created.
             tzinfo (datetime.tzinfo | None): The timezone to convert Datastore's UTC to/from.
-            **kwargs (Any): Additional base property arguments (e.g., `name`, `required`, `indexed`).
+            name (str | None): The Datastore column name. Defaults to Python attribute name.
+            indexed (bool): Whether the Datastore should index this property. Defaults to True.
+            repeated (bool): If True, expects an iterable of datetimes.
+            required (bool): If True, assigning `None` will raise a ValueError.
+            default (Any): The default value or a zero-argument callable to generate one.
+            choices (list | None): An optional list of allowed values.
+            validators (list[Callable] | None): A list of custom validation functions.
         """
         self.auto_now = auto_now
         self.auto_now_add = auto_now_add
         self.tzinfo = tzinfo
 
-        if kwargs.get('repeated') and (auto_now or auto_now_add):
+        if repeated and (auto_now or auto_now_add):
             raise ValueError("auto_now and auto_now_add are incompatible with repeated properties.")
 
-        super().__init__(**kwargs)
+        super().__init__(
+            name=name,
+            indexed=indexed,
+            repeated=repeated,
+            required=required,
+            default=default,
+            choices=choices,
+            validators=validators
+        )
 
     def _prepare_for_put(self, instance: "Model") -> None:
         """Execute auto_now and auto_now_add logic."""
@@ -683,7 +848,13 @@ class DateProperty(DateTimeProperty):
             auto_now: bool = False,
             auto_now_add: bool = False,
             tzinfo: datetime.tzinfo | None = None,
-            **kwargs: Any
+            name: str | None = None,
+            indexed: bool = True,
+            repeated: bool = False,
+            required: bool = False,
+            default: Any = None,
+            choices: list | None = None,
+            validators: list[Callable] | None = None,
     ):
         """Initialize a new DateProperty.
 
@@ -691,9 +862,26 @@ class DateProperty(DateTimeProperty):
             auto_now (bool): If True, automatically set to the current date on every put().
             auto_now_add (bool): If True, automatically set to the current date when first created.
             tzinfo (datetime.tzinfo | None): The timezone used to evaluate the "current" date.
-            **kwargs (Any): Additional base property arguments (e.g., `name`, `required`, `indexed`).
+            name (str | None): The Datastore column name. Defaults to Python attribute name.
+            indexed (bool): Whether the Datastore should index this property.
+            repeated (bool): If True, expects an iterable of dates.
+            required (bool): If True, assigning `None` will raise a ValueError.
+            default (Any): The default value or a zero-argument callable to generate one.
+            choices (list | None): An optional list of allowed values.
+            validators (list[Callable] | None): A list of custom validation functions.
         """
-        super().__init__(auto_now=auto_now, auto_now_add=auto_now_add, tzinfo=tzinfo, **kwargs)
+        super().__init__(
+            auto_now=auto_now,
+            auto_now_add=auto_now_add,
+            tzinfo=tzinfo,
+            name=name,
+            indexed=indexed,
+            repeated=repeated,
+            required=required,
+            default=default,
+            choices=choices,
+            validators=validators
+        )
 
     def _validate_type(self, value: Any) -> Any:
         if not isinstance(value, datetime.date) or isinstance(value, datetime.datetime):
@@ -728,7 +916,13 @@ class TimeProperty(DateTimeProperty):
             auto_now: bool = False,
             auto_now_add: bool = False,
             tzinfo: datetime.tzinfo | None = None,
-            **kwargs: Any
+            name: str | None = None,
+            indexed: bool = True,
+            repeated: bool = False,
+            required: bool = False,
+            default: Any = None,
+            choices: list | None = None,
+            validators: list[Callable] | None = None,
     ):
         """Initialize a new TimeProperty.
 
@@ -736,9 +930,26 @@ class TimeProperty(DateTimeProperty):
             auto_now (bool): If True, automatically set to the current time on every put().
             auto_now_add (bool): If True, automatically set to the current time when first created.
             tzinfo (datetime.tzinfo | None): The timezone used to evaluate the "current" time.
-            **kwargs (Any): Additional base property arguments (e.g., `name`, `required`, `indexed`).
+            name (str | None): The Datastore column name. Defaults to Python attribute name.
+            indexed (bool): Whether the Datastore should index this property.
+            repeated (bool): If True, expects an iterable of times.
+            required (bool): If True, assigning `None` will raise a ValueError.
+            default (Any): The default value or a zero-argument callable to generate one.
+            choices (list | None): An optional list of allowed values.
+            validators (list[Callable] | None): A list of custom validation functions.
         """
-        super().__init__(auto_now=auto_now, auto_now_add=auto_now_add, tzinfo=tzinfo, **kwargs)
+        super().__init__(
+            auto_now=auto_now,
+            auto_now_add=auto_now_add,
+            tzinfo=tzinfo,
+            name=name,
+            indexed=indexed,
+            repeated=repeated,
+            required=required,
+            default=default,
+            choices=choices,
+            validators=validators
+        )
 
     def _validate_type(self, value: Any) -> Any:
         if not isinstance(value, datetime.time):
@@ -800,14 +1011,39 @@ class StructuredProperty(Property):
         ```
     """
 
-    def __init__(self, model_class: type["Model"], **kwargs: Any):
+    def __init__(
+            self,
+            model_class: type["Model"],
+            *,
+            name: str | None = None,
+            indexed: bool = True,
+            repeated: bool = False,
+            required: bool = False,
+            default: Any = None,
+            choices: list | None = None,
+            validators: list[Callable] | None = None,
+    ):
         """Initialize a new StructuredProperty.
 
         Args:
             model_class (type["Model"]): The class of the ODM Model to embed.
-            **kwargs: Additional base property arguments.
+            name (str | None): The Datastore column name. Defaults to Python attribute name.
+            indexed (bool): Whether the Datastore should index this property.
+            repeated (bool): If True, expects an iterable of Model instances.
+            required (bool): If True, assigning `None` will raise a ValueError.
+            default (Any): The default value or a zero-argument callable to generate one.
+            choices (list | None): An optional list of allowed values.
+            validators (list[Callable] | None): A list of custom validation functions.
         """
-        super().__init__(**kwargs)
+        super().__init__(
+            name=name,
+            indexed=indexed,
+            repeated=repeated,
+            required=required,
+            default=default,
+            choices=choices,
+            validators=validators
+        )
         self.model_class = model_class
 
     def __getattr__(self, item: str) -> Any:
@@ -925,15 +1161,47 @@ class GenericProperty(Property):
         ```
     """
 
-    def __init__(self, compressed: bool = False, **kwargs: Any):
-        kwargs.setdefault("indexed", not compressed)
+    def __init__(
+            self,
+            compressed: bool = False,
+            *,
+            name: str | None = None,
+            indexed: bool | None = None,
+            repeated: bool = False,
+            required: bool = False,
+            default: Any = None,
+            choices: list | None = None,
+            validators: list[Callable] | None = None,
+    ):
+        """Initialize a new GenericProperty.
 
-        if compressed and kwargs.get("indexed"):
+        Args:
+            compressed (bool): If True, compresses `bytes` values (forces `indexed=False`).
+            name (str | None): The Datastore column name. Defaults to Python attribute name.
+            indexed (bool | None): Whether the Datastore should index this property.
+                Defaults to True unless compressed=True.
+            repeated (bool): If True, expects an iterable of dynamic values.
+            required (bool): If True, assigning `None` will raise a ValueError.
+            default (Any): The default value or a zero-argument callable to generate one.
+            choices (list | None): An optional list of allowed values.
+            validators (list[Callable] | None): A list of custom validation functions.
+        """
+        actual_indexed = indexed if indexed is not None else (not compressed)
+
+        if compressed and actual_indexed:
             raise ValueError(
                 "A GenericProperty cannot be compressed and indexed at the same time."
             )
 
-        super().__init__(**kwargs)
+        super().__init__(
+            name=name,
+            indexed=actual_indexed,
+            repeated=repeated,
+            required=required,
+            default=default,
+            choices=choices,
+            validators=validators
+        )
         self.compressed = compressed
 
     def _to_base_type(self, value: Any) -> Any:
@@ -978,8 +1246,40 @@ class ComputedProperty(GenericProperty):
         ```
     """
 
-    def __init__(self, func: Callable | None = None, **kwargs: Any):
-        super().__init__(**kwargs)
+    def __init__(
+            self,
+            func: Callable | None = None,
+            *,
+            name: str | None = None,
+            indexed: bool = True,
+            repeated: bool = False,
+            required: bool = False,
+            default: Any = None,
+            choices: list | None = None,
+            validators: list[Callable] | None = None,
+    ):
+        """Initialize a new ComputedProperty.
+
+        Args:
+            func (Callable | None): The function to compute the property's value.
+            name (str | None): The Datastore column name. Defaults to Python attribute name.
+            indexed (bool): Whether the Datastore should index this property.
+            repeated (bool): If True, expects an iterable.
+            required (bool): If True, assigning `None` will raise a ValueError.
+            default (Any): The default value or a zero-argument callable to generate one.
+            choices (list | None): An optional list of allowed values.
+            validators (list[Callable] | None): A list of custom validation functions.
+        """
+        super().__init__(
+            compressed=False,
+            name=name,
+            indexed=indexed,
+            repeated=repeated,
+            required=required,
+            default=default,
+            choices=choices,
+            validators=validators
+        )
         self.func = func
 
     def __call__(self, func: Callable) -> "ComputedProperty":
