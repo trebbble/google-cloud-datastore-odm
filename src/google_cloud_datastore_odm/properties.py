@@ -10,7 +10,7 @@ import datetime
 import json
 import pickle
 import zlib
-from typing import TYPE_CHECKING, Any, Callable, List, Optional, Union
+from typing import TYPE_CHECKING, Any, Callable
 
 from google.cloud import datastore
 from google.cloud.datastore.helpers import GeoPoint
@@ -26,31 +26,31 @@ class Property:
     to manage state on the underlying `Model` instances.
 
     Responsibilities:
-    - Required checks and default value assignment
-    - Python type enforcement (via subclasses)
-    - Inline property-level validators
-    - Routing to Model-level `@field_validator` methods
-    - Datastore aliasing (`name`)
-    - Indexing control (`indexed`)
-    - List support (`repeated`)
-    - Value restriction (`choices`)
+        - Required checks and default value assignment
+        - Python type enforcement (via subclasses)
+        - Inline property-level validators
+        - Routing to Model-level `@field_validator` methods
+        - Datastore aliasing (`name`)
+        - Indexing control (`indexed`)
+        - List support (`repeated`)
+        - Value restriction (`choices`)
     """
 
     def __init__(
             self,
             *,
-            name: Optional[str] = None,
+            name: str | None = None,
             indexed: bool = True,
             repeated: bool = False,
             required: bool = False,
             default: Any = None,
-            choices: Optional[list] = None,
-            validators: Optional[List[Callable]] = None,
+            choices: list | None = None,
+            validators: list[Callable] | None = None,
     ):
         """Initialize a new Property.
 
         Args:
-            name (Optional[str]): The Datastore column name. If omitted, defaults to
+            name (str | None): The Datastore column name. If omitted, defaults to
                 the Python attribute name. Useful for mapping legacy database fields.
             indexed (bool): Whether the Datastore should index this property. Set to
                 False for massive text blocks to save space and reduce write costs. If not sure leave this True
@@ -61,15 +61,15 @@ class Property:
                 will raise a ValueError. Defaults to False.
             default (Any): The default value or a zero-argument callable to generate one
                 (e.g., `default=list` or `default=datetime.now`).
-            choices (Optional[list]): An optional list of allowed values. Assignments
+            choices (list | None): An optional list of allowed values. Assignments
                 not in this list will raise a ValueError.
-            validators (Optional[List[Callable]]): A list of custom validation functions.
+            validators (list[Callable] | None): A list of custom validation functions.
                 Each function should accept a single value, validate/mutate it, and return it.
 
         Raises:
             TypeError: If any provided validator is not callable.
 
-        Example:
+        Examples:
             ```python
             status = StringProperty(
                 default="draft",
@@ -84,7 +84,7 @@ class Property:
         self.repeated = repeated
         self.required = required
         self.choices = choices
-        self.validators: List[Callable] = validators or []
+        self.validators: list[Callable] = validators or []
 
         if self.repeated and default is None:
             self.default = []
@@ -96,49 +96,17 @@ class Property:
                 raise TypeError(f"Validator {validator} for property '{self}' is not callable")
 
     def __set_name__(self, owner: type, name: str) -> None:
-        """Called automatically by Python to set the attribute name.
-
-        Args:
-            owner (type): The class that owns this descriptor.
-            name (str): The name of the attribute on the class.
-        """
+        """Called automatically by Python to set the attribute name."""
         self._python_name = name
         if not self.datastore_name:
             self.datastore_name = name
 
     def _validate_type(self, value: Any) -> Any:
-        """Enforce Python types.
-
-        This method should be overridden by subclasses (e.g., `StringProperty`).
-
-        Args:
-            value (Any): The value to type-check.
-
-        Returns:
-            Any: The type-cast or verified value.
-        """
+        """Enforce Python types. This method should be overridden by subclasses."""
         return value
 
     def _validate_single_value(self, instance: "Model", value: Any) -> Any:
-        """Validate a single item through the full validation pipeline.
-
-        The pipeline executes in this exact order:
-        1. Type validation (`_validate_type`)
-        2. Choices restriction (`choices`)
-        3. Inline property validators (`validators=[...]`)
-        4. Model-level field validators (`@field_validator('prop')`)
-
-        Args:
-            instance (Model): The model instance this property is attached to.
-            value (Any): The specific value to validate.
-
-        Raises:
-            ValueError: If the value violates choices or a custom validation rule.
-            TypeError: If the value violates the property's type constraint.
-
-        Returns:
-            Any: The fully validated and potentially coerced value.
-        """
+        """Validate a single item through the full validation pipeline."""
         value = self._validate_type(value)
 
         if self.choices is not None and value not in self.choices:
@@ -187,11 +155,8 @@ class Property:
         else:
             return self._validate_single_value(instance, value)
 
-    def __get__(self, instance: Optional["Model"], owner: type) -> Any:
-        """Retrieve the property value from the model instance's internal dictionary.
-
-        If accessed on the class itself, returns the Property descriptor instance.
-        """
+    def __get__(self, instance: "Model | None", owner: type) -> Any:
+        """Retrieve the property value from the model instance's internal dictionary."""
         if instance is None:
             return self
 
@@ -234,11 +199,7 @@ class Property:
         return value
 
     def _prepare_for_put(self, instance: "Model") -> None:
-        """
-        Hook that runs immediately before an instance is saved to Datastore.
-
-        Useful for properties like DateTimeProperty to implement `auto_now`.
-        """
+        """Hook that runs immediately before an instance is saved to Datastore."""
         pass
 
     def _comparison(self, op: str, value: Any) -> Any:
@@ -268,7 +229,7 @@ class Property:
     def __ge__(self, value: Any):
         return self._comparison(">=", value)
 
-    def in_(self, values: list):
+    def in_(self, values: list | tuple | set):
         """Generates an 'IN' query filter."""
         from .query import FilterNode
 
@@ -276,10 +237,9 @@ class Property:
             raise TypeError("IN operator requires an iterable (list, tuple, set)")
 
         base_values = [self._to_base_type(v) for v in values]
-
         return FilterNode(self.datastore_name, "IN", base_values)
 
-    def not_in_(self, values: list):
+    def not_in_(self, values: list | tuple | set):
         """Generates a 'NOT IN' query filter."""
         from .query import FilterNode
 
@@ -287,19 +247,16 @@ class Property:
             raise TypeError("NOT_IN operator requires an iterable (list, tuple, set)")
 
         base_values = [self._to_base_type(v) for v in values]
-
         return FilterNode(self.datastore_name, "NOT_IN", base_values)
 
     def __neg__(self):
         """Allows descending order queries using the unary minus: -Article.age"""
         from .query import OrderNode
-
         return OrderNode(self.datastore_name, descending=True)
 
     def __pos__(self):
         """Allows explicit ascending order queries: +Article.age"""
         from .query import OrderNode
-
         return OrderNode(self.datastore_name, descending=False)
 
     IN = in_
@@ -311,13 +268,20 @@ class KeyProperty(Property):
 
     This property acts as a foreign key to create relationships between entities.
     It can optionally be restricted to only accept keys of a specific entity kind.
+
+    Examples:
+        ```python
+        class Post(Model):
+            # Restrict to keys of the 'Author' kind
+            author_key = KeyProperty(kind="Author")
+        ```
     """
 
-    def __init__(self, kind: Optional[Union[str, Any]] = None, **kwargs: Any):
+    def __init__(self, kind: str | Any | None = None, **kwargs: Any):
         """Initialize a new KeyProperty.
 
         Args:
-            kind (Optional[Union[str, Any]]): A string or Model class to restrict
+            kind (str | Any | None): A string or Model class to restrict
                 the allowed keys. If provided, assigning a key of a different
                 kind will raise a ValueError.
             **kwargs: Additional base property arguments.
@@ -326,7 +290,7 @@ class KeyProperty(Property):
         self._model = kind
 
     @property
-    def expected_kind(self) -> Optional[str]:
+    def expected_kind(self) -> str | None:
         """Resolve the expected kind string from a string or Model class."""
         if self._model is None:
             return None
@@ -360,6 +324,13 @@ class BytesProperty(Property):
     This replaces the legacy `BlobProperty`. It is by default unindexed to bypass
     Datastore's 1500-byte limit for indexed properties. It also supports optional
     zlib compression to reduce storage costs for large binary payloads.
+
+    Examples:
+        ```python
+        class FileUpload(Model):
+            # Automatically compress large binary files before saving
+            raw_data = BytesProperty(compressed=True)
+        ```
     """
 
     def __init__(self, compressed: bool = False, **kwargs: Any):
@@ -400,8 +371,15 @@ class PickleProperty(Property):
     Uses Python's built-in `pickle` module to serialize objects into bytes.
     It is by default unindexed to bypass Datastore's 1500-byte limit.
 
-    WARNING: The `pickle` module is not secure. Only unpickle data you trust.
+    **WARNING:** The `pickle` module is not secure. Only unpickle data you trust.
     For standard data structures, `JsonProperty` is highly recommended instead.
+
+    Examples:
+        ```python
+        class GameState(Model):
+            # Store complex Python objects natively
+            inventory_set = PickleProperty(compressed=True)
+        ```
     """
 
     def __init__(self, compressed: bool = False, **kwargs: Any):
@@ -435,20 +413,16 @@ class PickleProperty(Property):
 
 
 class StringProperty(Property):
-    """A Datastore property that strictly enforces string values."""
+    """A Datastore property that strictly enforces string values.
+
+    Examples:
+        ```python
+        class User(Model):
+            username = StringProperty(required=True)
+        ```
+    """
 
     def _validate_type(self, value: Any) -> Any:
-        """Enforce that the value is a string.
-
-        Args:
-            value (Any): The value to check.
-
-        Raises:
-            TypeError: If the value is not an instance of `str`.
-
-        Returns:
-            str: The validated string.
-        """
         if not isinstance(value, str):
             raise TypeError(f"Property '{self._python_name}' must be str")
         return value
@@ -460,40 +434,31 @@ class IntegerProperty(Property):
     Note: Python evaluates booleans as subclasses of integers (`isinstance(True, int)`
     is True). This descriptor explicitly rejects boolean values to maintain strict
     Datastore type integrity.
+
+    Examples:
+        ```python
+        class Product(Model):
+            stock_count = IntegerProperty(default=0)
+        ```
     """
 
     def _validate_type(self, value: Any) -> Any:
-        """Enforce that the value is an integer and NOT a boolean.
-
-        Args:
-            value (Any): The value to check.
-
-        Raises:
-            TypeError: If the value is not an integer, or if it is a boolean.
-
-        Returns:
-            int: The validated integer.
-        """
         if not isinstance(value, int) or isinstance(value, bool):
             raise TypeError(f"Property '{self._python_name}' must be int")
         return value
 
 
 class BooleanProperty(Property):
-    """A Datastore property that strictly enforces boolean values."""
+    """A Datastore property that strictly enforces boolean values.
+
+    Examples:
+        ```python
+        class User(Model):
+            is_active = BooleanProperty(default=True)
+        ```
+    """
 
     def _validate_type(self, value: Any) -> Any:
-        """Enforce that the value is a boolean.
-
-        Args:
-            value (Any): The value to check.
-
-        Raises:
-            TypeError: If the value is not a bool.
-
-        Returns:
-            bool: The validated boolean.
-        """
         if not isinstance(value, bool):
             raise TypeError(f"Property '{self._python_name}' must be a bool")
         return value
@@ -505,20 +470,15 @@ class FloatProperty(Property):
     This property safely accepts both `float` and `int` types, automatically
     casting `int` assignments to `float` to prevent strict type errors over
     simple math (e.g. assigning `1` instead of `1.0`).
+
+    Examples:
+        ```python
+        class Sensor(Model):
+            temperature = FloatProperty()
+        ```
     """
 
     def _validate_type(self, value: Any) -> Any:
-        """Enforce that the value is a float or integer.
-
-        Args:
-            value (Any): The value to check.
-
-        Raises:
-            TypeError: If the value is not an int/float, or if it is a boolean.
-
-        Returns:
-            float: The validated and cast floating-point number.
-        """
         if not isinstance(value, (int, float)) or isinstance(value, bool):
             raise TypeError(f"Property '{self._python_name}' must be a float")
         return float(value)
@@ -527,8 +487,15 @@ class FloatProperty(Property):
 class TextProperty(StringProperty):
     """A Datastore property for large strings.
 
-    Unlike StringProperty, this is strictly unindexed to bypass Datastore's
+    Unlike `StringProperty`, this is strictly unindexed to bypass Datastore's
     1500-byte limit. It also supports optional zlib compression for saving space.
+
+    Examples:
+        ```python
+        class Article(Model):
+            # Automatically compress large text blocks
+            body = TextProperty(compressed=True)
+        ```
     """
 
     def __init__(self, compressed: bool = False, **kwargs: Any):
@@ -560,6 +527,13 @@ class JsonProperty(Property):
     index explosions on arbitrarily nested dynamic keys. It also supports
     optional zlib compression to drastically reduce storage costs for massive
     JSON payloads.
+
+    Examples:
+        ```python
+        class AuditLog(Model):
+            # Store complex nested dictionaries securely
+            payload = JsonProperty(compressed=True)
+        ```
     """
 
     def __init__(self, compressed: bool = False, **kwargs: Any):
@@ -616,8 +590,18 @@ class JsonProperty(Property):
 class DateTimeProperty(Property):
     """A Datastore property that enforces datetime values.
 
-    If `tzinfo` is None, this expects naive datetimes and assumes UTC.
+    If `tzinfo` is `None`, this expects naive datetimes and assumes UTC.
     If `tzinfo` is provided, it converts Datastore's UTC datetimes to that timezone.
+
+    Examples:
+        ```python
+        class Article(Model):
+            # Automatically populate on first save
+            created_at = DateTimeProperty(auto_now_add=True, tzinfo=datetime.timezone.utc)
+
+            # Automatically update on every save
+            updated_at = DateTimeProperty(auto_now=True, tzinfo=datetime.timezone.utc)
+        ```
     """
 
     def __init__(
@@ -625,7 +609,7 @@ class DateTimeProperty(Property):
             *,
             auto_now: bool = False,
             auto_now_add: bool = False,
-            tzinfo: Optional[datetime.tzinfo] = None,
+            tzinfo: datetime.tzinfo | None = None,
             **kwargs: Any
     ):
         """Initialize a new DateTimeProperty.
@@ -633,7 +617,7 @@ class DateTimeProperty(Property):
         Args:
             auto_now (bool): If True, automatically set to the current time on every put().
             auto_now_add (bool): If True, automatically set to the current time when first created.
-            tzinfo (Optional[datetime.tzinfo]): The timezone to convert Datastore's UTC to/from.
+            tzinfo (datetime.tzinfo | None): The timezone to convert Datastore's UTC to/from.
             **kwargs (Any): Additional base property arguments (e.g., `name`, `required`, `indexed`).
         """
         self.auto_now = auto_now
@@ -660,7 +644,8 @@ class DateTimeProperty(Property):
         if self.tzinfo is None and value.tzinfo is not None:
             raise ValueError(
                 f"DateTimeProperty '{self._python_name}' without tzinfo can only support "
-                f"naive datetimes (presumed UTC).")
+                f"naive datetimes (presumed UTC)."
+            )
         return value
 
     def _from_base_type(self, value: Any) -> Any:
@@ -684,6 +669,12 @@ class DateProperty(DateTimeProperty):
 
     Datastore only supports Datetimes, so this property casts to a Datetime
     at midnight UTC before saving, and casts back to a Date when reading.
+
+    Examples:
+        ```python
+        class Employee(Model):
+            hire_date = DateProperty()
+        ```
     """
 
     def __init__(
@@ -691,7 +682,7 @@ class DateProperty(DateTimeProperty):
             *,
             auto_now: bool = False,
             auto_now_add: bool = False,
-            tzinfo: Optional[datetime.tzinfo] = None,
+            tzinfo: datetime.tzinfo | None = None,
             **kwargs: Any
     ):
         """Initialize a new DateProperty.
@@ -699,7 +690,7 @@ class DateProperty(DateTimeProperty):
         Args:
             auto_now (bool): If True, automatically set to the current date on every put().
             auto_now_add (bool): If True, automatically set to the current date when first created.
-            tzinfo (Optional[datetime.tzinfo]): The timezone used to evaluate the "current" date.
+            tzinfo (datetime.tzinfo | None): The timezone used to evaluate the "current" date.
             **kwargs (Any): Additional base property arguments (e.g., `name`, `required`, `indexed`).
         """
         super().__init__(auto_now=auto_now, auto_now_add=auto_now_add, tzinfo=tzinfo, **kwargs)
@@ -736,7 +727,7 @@ class TimeProperty(DateTimeProperty):
             *,
             auto_now: bool = False,
             auto_now_add: bool = False,
-            tzinfo: Optional[datetime.tzinfo] = None,
+            tzinfo: datetime.tzinfo | None = None,
             **kwargs: Any
     ):
         """Initialize a new TimeProperty.
@@ -744,7 +735,7 @@ class TimeProperty(DateTimeProperty):
         Args:
             auto_now (bool): If True, automatically set to the current time on every put().
             auto_now_add (bool): If True, automatically set to the current time when first created.
-            tzinfo (Optional[datetime.tzinfo]): The timezone used to evaluate the "current" time.
+            tzinfo (datetime.tzinfo | None): The timezone used to evaluate the "current" time.
             **kwargs (Any): Additional base property arguments (e.g., `name`, `required`, `indexed`).
         """
         super().__init__(auto_now=auto_now, auto_now_add=auto_now_add, tzinfo=tzinfo, **kwargs)
@@ -757,8 +748,10 @@ class TimeProperty(DateTimeProperty):
     def _to_base_type(self, value: Any) -> Any:
         if value is None:
             return None
-        return datetime.datetime(1970, 1, 1, value.hour, value.minute, value.second, value.microsecond,
-                                 tzinfo=datetime.timezone.utc)
+        return datetime.datetime(
+            1970, 1, 1, value.hour, value.minute, value.second, value.microsecond,
+            tzinfo=datetime.timezone.utc
+        )
 
     def _from_base_type(self, value: Any) -> Any:
         if value is None:
@@ -792,17 +785,33 @@ class StructuredProperty(Property):
 
     Maps directly to Datastore's `EmbeddedEntity` data type. Nested models are
     fully hydrated, validated, and natively queryable using dot-notation.
+
+    Examples:
+        ```python
+        class Address(Model):
+            city = StringProperty()
+
+        class Profile(Model):
+            # Embed the Address model completely
+            location = StructuredProperty(Address)
+
+        # Natively query embedded properties
+        Profile.query().filter(Profile.location.city == "London")
+        ```
     """
 
     def __init__(self, model_class: type["Model"], **kwargs: Any):
+        """Initialize a new StructuredProperty.
+
+        Args:
+            model_class (type["Model"]): The class of the ODM Model to embed.
+            **kwargs: Additional base property arguments.
+        """
         super().__init__(**kwargs)
         self.model_class = model_class
 
     def __getattr__(self, item: str) -> Any:
-        """
-        Intercept attribute access on the class level to build deep-query nodes!
-        Example: Article.author_info.city == "London"
-        """
+        """Intercept attribute access on the class level to build deep-query nodes!"""
         # noinspection PyProtectedMember
         if hasattr(self.model_class, '_properties') and item in self.model_class._properties:
 
@@ -877,7 +886,17 @@ class StructuredProperty(Property):
 class GeoPtProperty(Property):
     """A Datastore property for storing geographical coordinates (latitude and longitude).
 
-    Accepts a native `google.cloud.datastore.helpers.GeoPoint`
+    Accepts a native `google.cloud.datastore.helpers.GeoPoint`.
+
+    Examples:
+        ```python
+        from google.cloud.datastore.helpers import GeoPoint
+
+        class Landmark(Model):
+            location = GeoPtProperty()
+
+        eiffel_tower = Landmark(location=GeoPoint(48.8584, 2.2945))
+        ```
     """
 
     def _validate_type(self, value: Any) -> Any:
@@ -897,6 +916,13 @@ class GenericProperty(Property):
 
     Supports `compressed=True`, which is only effective for `bytes` values and
     forces `indexed=False`.
+
+    Examples:
+        ```python
+        class Webhook(Model):
+            # Accept whatever payload the external service sends
+            payload = GenericProperty()
+        ```
     """
 
     def __init__(self, compressed: bool = False, **kwargs: Any):
@@ -940,13 +966,23 @@ class ComputedProperty(GenericProperty):
 
     Cannot be assigned manually. The value is automatically evaluated when
     the property is accessed, or immediately before saving to the Datastore.
+
+    Examples:
+        ```python
+        class Article(Model):
+            content = TextProperty()
+
+            @ComputedProperty
+            def length(self):
+                return len(self.content) if self.content else 0
+        ```
     """
 
-    def __init__(self, func: Any = None, **kwargs: Any):
+    def __init__(self, func: Callable | None = None, **kwargs: Any):
         super().__init__(**kwargs)
         self.func = func
 
-    def __call__(self, func: Any) -> "ComputedProperty":
+    def __call__(self, func: Callable) -> "ComputedProperty":
         """Allows the property to be used as a decorator with arguments."""
         self.func = func
         return self
