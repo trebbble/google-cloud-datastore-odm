@@ -7,7 +7,7 @@ decorators required to define and interact with Datastore entities.
 
 import copy
 from collections import defaultdict
-from typing import Any, Callable, ClassVar, Dict, Iterator, List, Optional, Tuple
+from typing import Any, Callable, ClassVar, Iterator, Literal
 
 from google.cloud import datastore
 
@@ -24,8 +24,8 @@ def model_validator(func: Callable) -> Callable:
     """Decorator used to mark a method as a model-level validator.
 
     Model-level validators are executed when:
-    - `Model.validate()` is called explicitly
-    - `Model.put()` or `Model.put_multi()` is called
+        - `Model.validate()` is called explicitly.
+        - `Model.put()` or `Model.put_multi()` is called.
 
     They are NOT executed during instantiation or property assignment.
 
@@ -34,6 +34,18 @@ def model_validator(func: Callable) -> Callable:
 
     Returns:
         Callable: The decorated method.
+
+    Examples:
+        ```python
+        class Article(Model):
+            status = StringProperty(choices=["draft", "published"])
+            content = TextProperty()
+
+            @model_validator
+            def check_published_has_content(self):
+                if self.status == "published" and not self.content:
+                    raise ValueError("Cannot publish an empty article.")
+        ```
     """
     setattr(func, MODEL_VALIDATOR_ATTR, True)
     return func
@@ -42,14 +54,28 @@ def model_validator(func: Callable) -> Callable:
 def field_validator(field: str) -> Callable:
     """Decorator used to mark a method as a field-level validator.
 
-    Field validators run automatically during property assignment,
-    instantiation, and when calling `populate()`.
+    Field validators run automatically when:
+        - an instance is created.
+        - a property is assigned.
+        - `Model.populate()` is called.
 
     Args:
         field (str): The name of the Python property this validates.
 
     Returns:
         Callable: A decorator for the specific validation method.
+
+    Examples:
+        ```python
+        class User(Model):
+            age = IntegerProperty()
+
+            @field_validator("age")
+            def check_age(self, value: int) -> int:
+                if value < 0:
+                    raise ValueError("Age cannot be negative.")
+                return value
+        ```
     """
 
     def decorator(func: Callable) -> Callable:
@@ -62,17 +88,17 @@ def field_validator(field: str) -> Callable:
 class ModelMeta(type):
     """Metaclass responsible for parsing and collecting model configurations.
 
-    This runs once per model class at class creation time. It collects:
-    - Property definitions
-    - Model-level validators
-    - Field-level validators
-    - Datastore kind metadata and unindexed properties
+    This runs once per model class at class creation time and collects:
+        -  Property definitions.
+        -  Model-level validators.
+        -  Field-level validators.
+        -  Datastore kind metadata and unindexed properties.
     """
 
-    def __new__(mcs, class_name: str, base_classes: Tuple[type, ...], class_attrs: Dict[str, Any]):
-        collected_properties: Dict[str, Property] = {}
-        collected_validators: List[Callable] = []
-        collected_field_validators: Dict[str, List[str]] = defaultdict(list)
+    def __new__(mcs, class_name: str, base_classes: tuple[type, ...], class_attrs: dict[str, Any]):
+        collected_properties: dict[str, Property] = {}
+        collected_validators: list[Callable] = []
+        collected_field_validators: dict[str, list[str]] = defaultdict(list)
 
         # Inherit properties and validators from base classes
         for base_class in base_classes:
@@ -147,24 +173,24 @@ class Model(metaclass=ModelMeta):
     """Base ODM model for Google Cloud Datastore.
 
     Responsibilities:
-    - Property validation and memory storage
-    - Model-level and Field-level validation routing
-    - Datastore persistence, mapping, and hydration
-    - Lifecycle hook execution
+        - Property validation and memory storage
+        - Model-level and Field-level validation routing
+        - Datastore persistence, mapping, and hydration
+        - Lifecycle hook execution
     """
-    _properties: ClassVar[Dict[str, Property]] = {}
-    _model_validators: ClassVar[List[Callable]] = []
-    _field_validators: ClassVar[Dict[str, List[str]]] = {}
-    _project: ClassVar[Optional[str]] = None
-    _database: ClassVar[Optional[str]] = None
-    _namespace: ClassVar[Optional[str]] = None
+    _properties: ClassVar[dict[str, Property]] = {}
+    _model_validators: ClassVar[list[Callable]] = []
+    _field_validators: ClassVar[dict[str, list[str]]] = {}
+    _project: ClassVar[str | None] = None
+    _database: ClassVar[str | None] = None
+    _namespace: ClassVar[str | None] = None
     _kind: ClassVar[str]
     _unindexed_datastore_names: ClassVar[frozenset[str]] = frozenset()
 
-    key: Optional[datastore.Key] = None
+    key: datastore.Key | None = None
 
     @classmethod
-    def _get_kwarg_or_alias(cls, kwargs: Dict[str, Any], keyword: str, default: Any = None) -> Any:
+    def _get_kwarg_or_alias(cls, kwargs: dict[str, Any], keyword: str, default: Any = None) -> Any:
         """Extract Datastore routing metadata (id, parent) safely.
 
         If the user defined a property with a reserved name, they must use the
@@ -182,9 +208,9 @@ class Model(metaclass=ModelMeta):
     @classmethod
     def _resolve_routing(
             cls,
-            project: Optional[str] = None,
-            database: Optional[str] = None
-    ) -> Tuple[Optional[str], Optional[str]]:
+            project: str | None = None,
+            database: str | None = None
+    ) -> tuple[str | None, str | None]:
         """
         Resolves the correct project and database in this strict order:
         1. Explicit kwargs passed to the method
@@ -208,27 +234,57 @@ class Model(metaclass=ModelMeta):
         return resolved_proj, resolved_db
 
     def __init__(self, **kwargs: Any) -> None:
-        """Initialize a new model instance.
+        """Initialize a new model instance. Properties can be passed as keyword arguments.
 
-        Properties can be passed as keyword arguments.
+        Keyword arguments to explicitly set Datastore key components:
+            -  `key`
+            -  `id`
+            -  `parent`
 
-        To explicitly set the Datastore key components, use the `id`, `parent`, or `key` kwargs.
-        To explicitly set routing metadata use `project`, `database` and `namespace` kwargs.
+        Keyword arguments to explicitly set routing metadata:
+            -  `project`
+            -  `database`
+            -  `namespace`
 
-        If your model has an actual property named after those keywords, prefix the routing kwargs with an underscore:
-         `_id`, `_parent`, `_project`, `_database`, `_namespace`
 
-        'key' is reserved and prohibited from being used as a property name but if you have an actual Datastore
-        field called 'key' you can still access it by using the alias feature.
+        Note:
+         If your model has an actual property named after the aforementioned keywords, and yet you still need to
+         use Datastore key components and/or routing metadata, prefix the related keyword arguments with an underscore:
+
+            - `_id`
+            - `_parent`
+            - `_project`
+            - `_database`
+            - `_namespace`
+
+        Warning:
+            `key` is  reserved and prohibited from being used as a property name but if you have an actual Datastore
+            field called `key` you can still access it by using the alias feature.
+            e.g:
+
+                class User(Model):
+                    user_key = StringProperty(name='key')
+                    name = StringProperty()
+                    age = IntegerProperty()
+
 
         Args:
-            **kwargs: Property values and Datastore routing metadata
+            **kwargs: Property values and Datastore routing metadata.
 
         Raises:
             ValueError: If a required property is missing.
             AttributeError: If an unknown property is provided.
+
+        Examples:
+            ```python
+            # Create a model with an auto-generated ID
+            user = User(name="Alice", age=30)
+
+            # Create a model with an explicit string ID
+            user = User(id="alice-123", name="Alice")
+            ```
         """
-        self._values: Dict[str, Any] = {}
+        self._values: dict[str, Any] = {}
 
         self._is_projected = kwargs.pop("_is_projected", False)
 
@@ -336,15 +392,15 @@ class Model(metaclass=ModelMeta):
         """Return a view of the model's property names and values."""
         return self._values.items()
 
-    def to_dict(self, include: Optional[List[str]] = None, exclude: Optional[List[str]] = None) -> Dict[str, Any]:
+    def to_dict(self, include: list[str] | None = None, exclude: list[str] | None = None) -> dict[str, Any]:
         """Return a shallow dictionary representation of the model properties.
 
         Args:
-            include (Optional[List[str]]): If provided, only include these Python property names.
-            exclude (Optional[List[str]]): If provided, exclude these Python property names.
+            include (list[str] | None): If provided, only include these Python property names.
+            exclude (list[str] | None): If provided, exclude these Python property names.
 
         Returns:
-            Dict[str, Any]: A dictionary mapping Python property names to their current values.
+            dict[str, Any]: A dictionary mapping Python property names to their current values.
         """
         result = {}
         for py_name in self._properties:
@@ -372,19 +428,25 @@ class Model(metaclass=ModelMeta):
         return cls._kind
 
     @classmethod
-    def get_schema(cls, output_format: str = "full") -> Any:
+    def get_schema(
+            cls,
+            output_format: Literal[
+                "full", "properties", "named_properties", "property_names", "property_aliases"
+            ] = "full"
+    ) -> Any:
         """Introspect the model's schema and property configuration.
 
         Args:
-            output_format (str): The format of the returned schema.
-                - "full" (default): Dict[str, dict] with JSON-serializable configurations.
-                - "properties": List[Property] instances.
-                - "named_properties": Dict[str, Property] instances.
-                - "property_names": List[str] of Python property names.
-                - "property_aliases": Dict[str, str] mapping Python names to Datastore names.
+            output_format: Determines the structure of the returned data. Defaults to `"full"`.
 
         Returns:
-            Any: The schema in the requested format.
+            Any: The schema representation. The return type varies based on the requested format:
+
+            * `"full"`: A JSON-serializable `dict[str, dict]` of configurations.
+            * `"properties"`: A `list[Property]` containing the raw property instances.
+            * `"named_properties"`: A `dict[str, Property]` mapping Python names to instances.
+            * `"property_names"`: A `list[str]` of Python property names.
+            * `"property_aliases"`: A `dict[str, str]` mapping Python names to Datastore names.
         """
         valid_formats = (
             "properties",
@@ -432,11 +494,11 @@ class Model(metaclass=ModelMeta):
     def allocate_ids(
             cls,
             size: int,
-            parent: Optional[datastore.Key] = None,
-            project: Optional[str] = None,
-            database: Optional[str] = None,
-            namespace: Optional[str] = None
-    ) -> List[datastore.Key]:
+            parent: datastore.Key | None = None,
+            project: str | None = None,
+            database: str | None = None,
+            namespace: str | None = None
+    ) -> list[datastore.Key]:
         """Allocate a batch of integer IDs for this model's kind.
 
         Reserves a block of numeric IDs directly from the Datastore backend. This is
@@ -444,13 +506,13 @@ class Model(metaclass=ModelMeta):
 
         Args:
             size (int): The number of IDs to allocate. Must be > 0.
-            parent (Optional[datastore.Key]): An optional ancestor key for the allocated IDs.
-            project (Optional[str]): An optional project override.
-            database (Optional[str]): An optional database override.
-            namespace (Optional[str]): An optional namespace override.
+            parent (datastore.Key | None): An optional ancestor key for the allocated IDs.
+            project (str | None): An optional project override.
+            database (str | None): An optional database override.
+            namespace (str | None): An optional namespace override.
 
         Returns:
-            List[datastore.Key]: A list of fully resolved keys with allocated integer IDs.
+            list[datastore.Key]: A list of fully resolved keys with allocated integer IDs.
 
         Raises:
             ValueError: If the requested size is 0 or negative.
@@ -473,13 +535,13 @@ class Model(metaclass=ModelMeta):
         incomplete_key = client.key(cls._kind, **kwargs)
         return client.allocate_ids(incomplete_key, num_ids=size)
 
-    def allocate_key(self, parent: Optional[datastore.Key] = None) -> datastore.Key:
+    def allocate_key(self, parent: datastore.Key | None = None) -> datastore.Key:
         """Explicitly allocate a complete datastore key for this specific instance.
 
         Triggers a single RPC call to the Datastore to fetch an integer ID.
 
         Args:
-            parent (Optional[datastore.Key]): An optional ancestor key.
+            parent (datastore.Key | None): An optional ancestor key.
 
         Returns:
             datastore.Key: The newly allocated, fully resolved Key.
@@ -517,7 +579,7 @@ class Model(metaclass=ModelMeta):
             self.key = client.key(self._kind, **kwargs)
 
     @classmethod
-    def client(cls, project: Optional[str] = None, database: Optional[str] = None) -> datastore.Client:
+    def client(cls, project: str | None = None, database: str | None = None) -> datastore.Client:
         """Retrieve the configured active Datastore client."""
         return get_client(project=project, database=database)
 
@@ -525,19 +587,19 @@ class Model(metaclass=ModelMeta):
     def key_from_id(
             cls,
             identifier: Any,
-            parent: Optional[datastore.Key] = None,
-            project: Optional[str] = None,
-            database: Optional[str] = None,
-            namespace: Optional[str] = None
+            parent: datastore.Key | None = None,
+            project: str | None = None,
+            database: str | None = None,
+            namespace: str | None = None
     ) -> datastore.Key:
         """Construct a datastore Key for this model's kind.
 
         Args:
             identifier (Any): The string or integer ID for the entity.
-            parent (Optional[datastore.Key]): An optional ancestor key.
-            project (Optional[str]): An optional project override.
-            database (Optional[str]): An optional database override.
-            namespace (Optional[str]): An optional namespace override.
+            parent (datastore.Key | None): An optional ancestor key.
+            project (str | None): An optional project override.
+            database (str | None): An optional database override.
+            namespace (str | None): An optional namespace override.
 
         Returns:
             datastore.Key: The constructed Key object.
@@ -573,14 +635,15 @@ class Model(metaclass=ModelMeta):
                 raise AttributeError(f"Unknown property: {key}")
 
     @classmethod
-    def from_entity(cls, entity: Optional[datastore.Entity], _is_projected: bool = False) -> Optional["Model"]:
+    def from_entity(cls, entity: datastore.Entity | None, _is_projected: bool = False) -> "Model | None":
         """Create a model instance from a raw datastore Entity.
 
         Args:
-            entity (Optional[datastore.Entity]): The retrieved Datastore entity.
+            entity (datastore.Entity | None): The retrieved Datastore entity.
+            _is_projected (bool): Internal flag marking if this was fetched via projection.
 
         Returns:
-            Optional[Model]: A hydrated Python model instance, or None if no entity was provided.
+            Model | None: A hydrated Python model instance, or None if no entity was provided.
         """
         if entity is None:
             return None
@@ -607,12 +670,12 @@ class Model(metaclass=ModelMeta):
         pass
 
     @classmethod
-    def _post_get_hook(cls, key: datastore.Key, instance: Optional["Model"]) -> None:
+    def _post_get_hook(cls, key: datastore.Key, instance: "Model | None") -> None:
         """Runs immediately after an entity is fetched and hydrated into a Python object.
 
         Args:
             key (datastore.Key): The key that was requested.
-            instance (Optional[Model]): The hydrated model instance, or None if the
+            instance (Model | None): The hydrated model instance, or None if the
                 entity did not exist in the Datastore.
         """
         pass
@@ -636,7 +699,7 @@ class Model(metaclass=ModelMeta):
         pass
 
     @classmethod
-    def get(cls, key: datastore.Key) -> Optional["Model"]:
+    def get(cls, key: datastore.Key) -> "Model | None":
         """Fetch an entity by its Datastore key and hydrate a model instance.
 
         Executes the `_pre_get_hook` before fetching, and the `_post_get_hook`
@@ -646,7 +709,13 @@ class Model(metaclass=ModelMeta):
             key (datastore.Key): The Google Cloud Datastore Key to fetch.
 
         Returns:
-            Optional[Model]: The hydrated model instance, or None if not found.
+            Model | None: The hydrated model instance, or None if not found.
+
+        Examples:
+            ```python
+            my_key = client.key("User", "alice")
+            user = User.get(my_key)
+            ```
         """
         cls._pre_get_hook(key)
 
@@ -661,34 +730,44 @@ class Model(metaclass=ModelMeta):
         return instance
 
     @classmethod
-    def get_by_id(cls, identifier: Any, parent: Optional[datastore.Key] = None) -> Optional["Model"]:
+    def get_by_id(cls, identifier: Any, parent: datastore.Key | None = None) -> "Model | None":
         """Fetch an entity by its string or integer ID.
 
         Args:
             identifier (Any): The string name or integer ID.
-            parent (Optional[datastore.Key]): An optional ancestor key.
+            parent (datastore.Key | None): An optional ancestor key.
 
         Returns:
-            Optional[Model]: The hydrated model instance, or None if not found.
+            Model | None: The hydrated model instance, or None if not found.
+
+        Examples:
+            ```python
+            user = User.get_by_id("alice-123")
+            ```
         """
         return cls.get(cls.key_from_id(identifier, parent))
 
     @classmethod
     def query(
             cls,
-            project: Optional[str] = None,
-            database: Optional[str] = None,
-            namespace: Optional[str] = None
+            project: str | None = None,
+            database: str | None = None,
+            namespace: str | None = None
     ) -> Query:
         """Create a Query object for this model's Datastore kind.
 
         Args:
-            project (Optional[str]): An optional project override.
-            database (Optional[str]): An optional database override.
-            namespace (Optional[str]): An optional namespace override.
+            project (str | None): An optional project override.
+            database (str | None): An optional database override.
+            namespace (str | None): An optional namespace override.
 
         Returns:
             Query: An ODM Query object ready for filtering and fetching.
+
+        Examples:
+            ```python
+            active_users = list(User.query().filter(User.is_active == True).fetch())
+            ```
         """
         resolved_proj, resolved_db = cls._resolve_routing(project, database)
         resolved_ns = namespace if namespace is not None else cls._namespace
@@ -708,14 +787,14 @@ class Model(metaclass=ModelMeta):
             if value in (None, []):
                 raise ValueError(f"Property '{py_name}' is required")
 
-    def put(self, exclude_from_indexes: Optional[List[str]] = None) -> datastore.Key:
+    def put(self, exclude_from_indexes: list[str] | None = None) -> datastore.Key:
         """Persist the model instance to the Datastore.
 
         Triggers model-level validation and runs the `_pre_put_hook` and `_post_put_hook`.
         If the instance does not have a complete key, Datastore auto-assigns an ID natively.
 
         Args:
-            exclude_from_indexes (Optional[List[str]]): An optional list of Python property
+            exclude_from_indexes (list[str] | None): An optional list of Python property
                 names (or even raw datastore fields) to dynamically exclude
                 from Datastore indexes for this specific write.
 
@@ -798,17 +877,17 @@ class Model(metaclass=ModelMeta):
         self._post_delete_hook(self.key)
 
     @classmethod
-    def get_multi(cls, keys: List[datastore.Key]) -> List[Optional["Model"]]:
+    def get_multi(cls, keys: list[datastore.Key]) -> list["Model | None"]:
         """Fetch multiple entities by their keys in a single RPC call.
 
         Returns a list of model instances in the exact order of the provided keys.
         Missing entities are represented as `None` in the returned list.
 
         Args:
-            keys (List[datastore.Key]): A list of Datastore keys to fetch.
+            keys (list[datastore.Key]): A list of Datastore keys to fetch.
 
         Returns:
-            List[Optional[Model]]: Hydrated instances or None, preserving input order.
+            list[Model | None]: Hydrated instances or None, preserving input order.
         """
         if not keys:
             return []
@@ -836,7 +915,7 @@ class Model(metaclass=ModelMeta):
         return instances
 
     @classmethod
-    def put_multi(cls, instances: List["Model"]) -> List[datastore.Key]:
+    def put_multi(cls, instances: list["Model"]) -> list[datastore.Key]:
         """Persist multiple model instances in a single batch Datastore operation.
 
         This is significantly faster and more cost-effective than calling `.put()`
@@ -844,10 +923,10 @@ class Model(metaclass=ModelMeta):
         triggered for each instance.
 
         Args:
-            instances (List[Model]): A list of unsaved or modified model instances.
+            instances (list[Model]): A list of unsaved or modified model instances.
 
         Returns:
-            List[datastore.Key]: A list of keys corresponding to the saved entities.
+            list[datastore.Key]: A list of keys corresponding to the saved entities.
         """
         if not instances:
             return []
@@ -928,11 +1007,11 @@ class Model(metaclass=ModelMeta):
         return [instance.key for instance in instances]
 
     @classmethod
-    def delete_multi(cls, keys: List[datastore.Key]) -> None:
+    def delete_multi(cls, keys: list[datastore.Key]) -> None:
         """Delete multiple entities by their keys in a single batch Datastore operation.
 
         Args:
-            keys (List[datastore.Key]): A list of fully resolved Datastore Keys to delete.
+            keys (list[datastore.Key]): A list of fully resolved Datastore Keys to delete.
         """
         if not keys:
             return
