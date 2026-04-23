@@ -2,7 +2,7 @@
 Property descriptors for the Google Cloud Datastore ODM.
 
 This module provides the base `Property` descriptor and its type-specific subclasses
-(e.g., `StringProperty`, `IntegerProperty`). These classes handle data coercion,
+(e.g., `StringProperty`, `IntegerProperty`, etc.). These classes handle data coercion,
 validation, default values, and Datastore schema mapping.
 """
 
