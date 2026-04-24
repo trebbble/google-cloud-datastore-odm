@@ -6,13 +6,22 @@ repo_url = "https://github.com/trebbble/google-cloud-datastore-odm"
 nav = [
     { "Home" = "index.md" },
     { "Getting Started" = "getting_started.md" },
+    { "User Guide" = [
+        { "Models & Properties" = "guide/models.md" },
+        { "Validation & Hooks" = "guide/validation.md" },
+        { "Queries & Aggregations" = "guide/queries.md" },
+        { "Transactions" = "guide/transactions.md" },
+        { "Multi-Tenancy & Routing" = "guide/routing.md" },
+    ]},
     { "API Reference" = [
         { "Client" = "api/client.md" },
         { "Model" = "api/model.md" },
         { "Properties" = "api/properties.md" },
         { "Query" = "api/query.md" },
         { "Transaction" = "api/transaction.md" },
-    ]}
+    ]},
+    { "Contributing" = "contributing.md" },
+    { "Roadmap" = "roadmap.md" }
 ]
 
 [project.theme]
