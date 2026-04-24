@@ -13,6 +13,7 @@ nav = [
         { "Transactions" = "guide/transactions.md" },
         { "Multi-Tenancy & Routing" = "guide/routing.md" },
     ]},
+    { "Migration from NDB" = "guide/migration.md" },
     { "API Reference" = [
         { "Client" = "api/client.md" },
         { "Model" = "api/model.md" },
