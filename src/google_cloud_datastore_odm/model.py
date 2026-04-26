@@ -6,6 +6,7 @@ decorators required to define and interact with Datastore entities.
 """
 
 import copy
+import json
 from collections import defaultdict
 from typing import Any, Callable, ClassVar, Iterator, Literal
 
@@ -18,6 +19,7 @@ from .transaction import get_current_transaction
 
 MODEL_VALIDATOR_ATTR = "__model_validator__"
 FIELD_VALIDATOR_ATTR = "__field_validator__"
+FIELD_SERIALIZER_ATTR = "__field_serializer__"
 
 
 def model_validator(func: Callable) -> Callable:
@@ -85,6 +87,34 @@ def field_validator(field: str) -> Callable:
     return decorator
 
 
+def field_serializer(field: str) -> Callable:
+    """Decorator used to mark a method as a custom JSON serializer for a field.
+
+    This runs when `Model.to_json()` is called, allowing you to override
+    how specific properties are serialized into strings or primitives.
+
+    Args:
+        field (str): The name of the Python property this serializes.
+
+    Returns:
+        Callable: A decorator for the specific serialization method.
+
+    Examples:
+        ```python
+        class Task(Model):
+            created_at = DateTimeProperty()
+
+            @field_serializer("created_at")
+            def format_date(self, value: datetime) -> str:
+                return value.strftime("%Y-%m-%d")
+        ```
+    """
+    def decorator(func: Callable) -> Callable:
+        setattr(func, FIELD_SERIALIZER_ATTR, field)
+        return func
+    return decorator
+
+
 class ModelMeta(type):
     """Metaclass responsible for parsing and collecting model configurations.
 
@@ -92,6 +122,7 @@ class ModelMeta(type):
         -  Property definitions.
         -  Model-level validators.
         -  Field-level validators.
+        -  Field-level serializers.
         -  Datastore kind metadata and unindexed properties.
     """
 
@@ -99,11 +130,13 @@ class ModelMeta(type):
         collected_properties: dict[str, Property] = {}
         collected_validators: list[Callable] = []
         collected_field_validators: dict[str, list[str]] = defaultdict(list)
+        collected_field_serializers: dict[str, str] = {}
 
         # Inherit properties and validators from base classes
         for base_class in base_classes:
             collected_properties.update(getattr(base_class, "_properties", {}))
             collected_validators.extend(getattr(base_class, "_model_validators", []))
+            collected_field_serializers.update(getattr(base_class, "_field_serializers", {}))
 
             for field, methods in getattr(base_class, "_field_validators", {}).items():
                 collected_field_validators[field].extend(methods)
@@ -144,13 +177,26 @@ class ModelMeta(type):
                     )
                 collected_validators.append(attribute_value)
 
-            field_name = getattr(attribute_value, FIELD_VALIDATOR_ATTR, None)
-            if field_name:
+            field_validator_name = getattr(attribute_value, FIELD_VALIDATOR_ATTR, None)
+            if field_validator_name:
                 if not callable(attribute_value):
                     raise TypeError(
                         f"Field validator '{attribute_name}' on class '{class_name}' is not callable"
                     )
-                collected_field_validators[field_name].append(attribute_name)
+                collected_field_validators[field_validator_name].append(attribute_name)
+
+            field_serializer_name = getattr(attribute_value, FIELD_SERIALIZER_ATTR, None)
+            if field_serializer_name:
+                if field_serializer_name in collected_field_serializers:
+                    raise ValueError(
+                        f"{field_serializer_name} field serializer has already a registered serializer: "
+                        f"'{collected_field_serializers[field_serializer_name]}'"
+                    )
+                if not callable(attribute_value):
+                    raise TypeError(
+                        f"Field serializer '{attribute_name}' on class '{class_name}' is not callable"
+                    )
+                collected_field_serializers[field_serializer_name] = attribute_name
 
         unindexed = set()
         for py_name, prop in collected_properties.items():
@@ -160,6 +206,7 @@ class ModelMeta(type):
         class_attrs["_properties"] = collected_properties
         class_attrs["_model_validators"] = collected_validators
         class_attrs["_field_validators"] = dict(collected_field_validators)
+        class_attrs["_field_serializers"] = collected_field_serializers
         class_attrs["_project"] = datastore_project
         class_attrs["_database"] = datastore_database
         class_attrs["_namespace"] = datastore_namespace
@@ -181,6 +228,7 @@ class Model(metaclass=ModelMeta):
     _properties: ClassVar[dict[str, Property]] = {}
     _model_validators: ClassVar[list[Callable]] = []
     _field_validators: ClassVar[dict[str, list[str]]] = {}
+    _field_serializers: ClassVar[dict[str, str]] = {}
     _project: ClassVar[str | None] = None
     _database: ClassVar[str | None] = None
     _namespace: ClassVar[str | None] = None
@@ -395,6 +443,9 @@ class Model(metaclass=ModelMeta):
     def to_dict(self, include: list[str] | None = None, exclude: list[str] | None = None) -> dict[str, Any]:
         """Return a shallow dictionary representation of the model properties.
 
+        Returns raw Python types (e.g., datetime, bytes, datastore.Key).
+        For a JSON-serialized string representation, use `to_json()`.
+
         Args:
             include (list[str] | None): If provided, only include these Python property names.
             exclude (list[str] | None): If provided, exclude these Python property names.
@@ -409,9 +460,53 @@ class Model(metaclass=ModelMeta):
             if exclude and py_name in exclude:
                 continue
 
-            result[py_name] = self._values.get(py_name)
+            result[py_name] = getattr(self, py_name)
 
         return result
+
+    def to_json_dict(self, include: list[str] | None = None, exclude: list[str] | None = None) -> dict[str, Any]:
+        """Internal helper to build a perfectly JSON-safe dictionary of primitives.
+
+        This prevents double-serialization bugs when structured properties embed
+        other models that also call to_json().
+        """
+        result = {}
+        for py_name, prop in self._properties.items():
+            if include and py_name not in include: continue
+            if exclude and py_name in exclude: continue
+
+            val = getattr(self, py_name)
+
+            if py_name in self._field_serializers:
+                method_name = self._field_serializers[py_name]
+                result[py_name] = getattr(self, method_name)(val)
+                continue
+
+            if val is None:
+                result[py_name] = None
+                continue
+
+            if prop.repeated:
+                result[py_name] = [prop.serialize_value(v) for v in val]
+            else:
+                result[py_name] = prop.serialize_value(val)
+
+        return result
+
+    def to_json(self, include: list[str] | None = None, exclude: list[str] | None = None) -> str:
+        """Return a strict JSON string representation of the model.
+
+        Executes default serialization for complex properties (e.g., datetimes to ISO strings,
+        keys to urlsafe strings) and applies any custom `@field_serializer` hooks.
+
+        Args:
+            include (list[str] | None): If provided, only serialize these Python property names.
+            exclude (list[str] | None): If provided, exclude these Python property names.
+
+        Returns:
+            str: The JSON-encoded string.
+        """
+        return json.dumps(self.to_json_dict(include=include, exclude=exclude))
 
     def validate(self) -> None:
         """Execute all model-level validators.

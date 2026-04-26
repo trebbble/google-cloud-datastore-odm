@@ -3,9 +3,11 @@ import datetime
 import pytest
 from google.cloud import datastore
 from google.cloud.datastore.helpers import GeoPoint
+import base64
+import pickle
 
 from google_cloud_datastore_odm.client import get_client
-from google_cloud_datastore_odm.model import Model, field_validator
+from google_cloud_datastore_odm.model import Model, field_validator, field_serializer
 from google_cloud_datastore_odm.properties import (
     BooleanProperty,
     BytesProperty,
@@ -972,3 +974,210 @@ def test_computed_property():
     assert instance.size == 4
     with pytest.raises(AttributeError):
         instance.size = 5
+
+
+def test_metaclass_duplicate_field_serializer_raises():
+    """Verify that registering two serializers for the same field fails fast."""
+    with pytest.raises(ValueError):
+        class BadSerializerModel(Model):
+            name = StringProperty()
+
+            @field_serializer("name")
+            def ser_one(self, val):
+                return val
+
+            @field_serializer("name")
+            def ser_two(self, val):
+                return val
+
+
+def test_metaclass_non_callable_field_serializer_raises():
+    """Verify that a non-callable serializer raises a TypeError."""
+    with pytest.raises(TypeError):
+        class DummyObj:
+            pass
+
+        bad_mock = DummyObj()
+        bad_mock.__field_serializer__ = "name"
+
+        class BadModel(Model):
+            name = StringProperty()
+            bad_serializer = bad_mock
+
+
+def test_property_specific_serialize_value():
+    """Verify the default JSON-safe primitive conversions for complex Datastore types."""
+    client = get_client()
+
+    dt_prop = DateTimeProperty()
+    now = datetime.datetime(2025, 1, 1, 12, 0, tzinfo=datetime.timezone.utc)
+    assert dt_prop.serialize_value(now) == now.isoformat()
+    assert dt_prop.serialize_value(None) is None
+
+    geo_prop = GeoPtProperty()
+    pt = GeoPoint(37.7749, -122.4194)
+    assert geo_prop.serialize_value(pt) == {"latitude": 37.7749, "longitude": -122.4194}
+    assert geo_prop.serialize_value(None) is None
+
+    key_prop = KeyProperty()
+    mock_key = client.key("User", 123)
+    assert key_prop.serialize_value(mock_key) == mock_key.to_legacy_urlsafe().decode("utf-8")
+    assert key_prop.serialize_value(None) is None
+
+    bytes_prop = BytesProperty()
+    raw_bytes = b"hello"
+    assert bytes_prop.serialize_value(raw_bytes) == base64.b64encode(raw_bytes).decode("utf-8")
+    assert bytes_prop.serialize_value(None) is None
+
+    pickle_prop = PickleProperty()
+    raw_bytes = b"hello"
+    assert pickle_prop.serialize_value(raw_bytes) == base64.b64encode(pickle.dumps(raw_bytes)).decode('utf-8')
+    assert pickle_prop.serialize_value(None) is None
+
+
+def test_generic_property_recursive_serialization():
+    """Verify that GenericProperty safely walks nested dynamic structures."""
+    client = get_client()
+
+    class DynamicModel(Model):
+        data = GenericProperty()
+
+    instance = DynamicModel()
+
+    dt = datetime.datetime(2025, 1, 1, 12, 0, tzinfo=datetime.timezone.utc)
+    mock_key = client.key("Item", 456)
+
+    instance.data = {
+        "a_date": dt,
+        "a_key": mock_key,
+        "a_list": [b"bytes", GeoPoint(1.0, 2.0)],
+        "nested": {"deep": dt},
+        "standard": "string"
+    }
+
+    json_dict = instance.to_json_dict()
+
+    assert json_dict["data"]["a_date"] == dt.isoformat()
+    assert json_dict["data"]["a_key"] == mock_key.to_legacy_urlsafe().decode("utf-8")
+    assert json_dict["data"]["a_list"][0] == base64.b64encode(b"bytes").decode("utf-8")
+    assert json_dict["data"]["a_list"][1] == {"latitude": 1.0, "longitude": 2.0}
+    assert json_dict["data"]["nested"]["deep"] == dt.isoformat()
+    assert json_dict["data"]["standard"] == "string"
+
+
+def test_structured_property_serialization():
+    """Verify that embedded models use _to_json_dict to prevent double-encoding."""
+
+    class Inner(Model):
+        name = StringProperty()
+        created_at = DateTimeProperty(tzinfo=datetime.timezone.utc)
+
+    class Outer(Model):
+        inner = StructuredProperty(Inner)
+
+    dt = datetime.datetime(2025, 1, 1, 12, 0, tzinfo=datetime.timezone.utc)
+    inner_inst = Inner(name="Alice", created_at=dt)
+    outer_inst = Outer(inner=inner_inst)
+
+    json_dict = outer_inst.to_json_dict()
+
+    assert isinstance(json_dict["inner"], dict)
+    assert json_dict["inner"]["name"] == "Alice"
+    assert json_dict["inner"]["created_at"] == dt.isoformat()
+
+
+def test_to_dict_vs_to_json_dict_with_serializers():
+    """Verify the separation of concerns and user-defined hooks."""
+
+    class CustomSerializerModel(Model):
+        dt = DateTimeProperty()
+        raw = StringProperty()
+        empty = StringProperty()
+
+        @field_serializer("dt")
+        def format_dt(self, value: datetime.datetime) -> str:
+            if value is None:
+                return "no_date"
+            return value.strftime("%Y-%m-%d")
+
+    now = datetime.datetime(2025, 5, 20, 15, 30)
+    instance = CustomSerializerModel(dt=now, raw="hello")
+
+    raw_dict = instance.to_dict()
+    assert raw_dict["dt"] == now
+    assert raw_dict["empty"] is None
+
+    json_dict = instance.to_json_dict()
+    assert json_dict["dt"] == "2025-05-20"
+    assert json_dict["empty"] is None
+
+    json_str = instance.to_json()
+    assert '"2025-05-20"' in json_str
+    assert '"hello"' in json_str
+
+
+def test_json_dict_include_exclude():
+    """Verify that include/exclude filters work correctly on serialization."""
+
+    class FilterModel(Model):
+        a = StringProperty()
+        b = StringProperty()
+        c = StringProperty()
+
+    inst = FilterModel(a="1", b="2", c="3")
+
+    # Include only A and B, but explicitly exclude B
+    jd = inst.to_json_dict(include=["a", "b"], exclude=["b"])
+
+    assert "a" in jd
+    assert "b" not in jd
+    assert "c" not in jd
+
+
+def test_to_json_dict_repeated_properties():
+    """Verify array serialization defaults and hooks."""
+
+    class ArrayModel(Model):
+        names = StringProperty(repeated=True)
+        dates = DateTimeProperty(repeated=True)
+
+        @field_serializer("dates")
+        def stringify_dates(self, values: list) -> list:
+            return ["custom" for _ in values]
+
+    name1, name2 = "name1", "name2"
+    dt1 = datetime.datetime(2025, 1, 1)
+    dt2 = datetime.datetime(2026, 1, 1)
+
+    instance = ArrayModel(names=[name1, name2], dates=[dt1, dt2])
+
+    json_dict = instance.to_json_dict()
+    assert json_dict["names"] == [name1, name2]
+    assert json_dict["dates"] == ["custom", "custom"]
+
+
+def test_all_properties_serialize_none_safely():
+    """Directly test the defensive None checks in all serialize_value methods."""
+
+    properties_to_test = [
+        Property(),
+        StringProperty(),
+        IntegerProperty(),
+        FloatProperty(),
+        BooleanProperty(),
+        TextProperty(),
+        JsonProperty(),
+        BytesProperty(),
+        PickleProperty(),
+        KeyProperty(),
+        GeoPtProperty(),
+        GenericProperty(),
+        ComputedProperty(lambda x: x),
+        DateTimeProperty(),
+        DateProperty(),
+        TimeProperty(),
+        StructuredProperty(DemoModel),
+    ]
+
+    for prop in properties_to_test:
+        assert prop.serialize_value(None) is None

@@ -1,6 +1,7 @@
 from .model import Model as Model
 from .model import field_validator as field_validator
 from .model import model_validator as model_validator
+from .model import field_serializer as field_serializer
 from .properties import BooleanProperty as BooleanProperty
 from .properties import BytesProperty as BytesProperty
 from .properties import ComputedProperty as ComputedProperty
@@ -29,6 +30,7 @@ __all__ = [
     "Model",
     "field_validator",
     "model_validator",
+    "field_serializer",
     "Property",
     "StructuredProperty",
     "KeyProperty",

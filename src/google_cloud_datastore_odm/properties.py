@@ -6,6 +6,7 @@ This module provides the base `Property` descriptor and its type-specific subcla
 validation, default values, and Datastore schema mapping.
 """
 
+import base64
 import datetime
 import json
 import pickle
@@ -198,6 +199,17 @@ class Property:
         """
         return value
 
+    def serialize_value(self, value: Any) -> Any:
+        """
+        Convert the Python value into a JSON-safe primitive.
+
+        By default, this is a simple pass-through. Subclasses containing complex
+        types (e.g. datetimes, bytes, Datastore keys) must override this.
+        """
+        if value is None:
+            return None
+        return value
+
     def _prepare_for_put(self, instance: "Model") -> None:
         """Hook that runs immediately before an instance is saved to Datastore."""
         pass
@@ -342,6 +354,11 @@ class KeyProperty(Property):
 
         return value
 
+    def serialize_value(self, value: datastore.Key) -> str | None:
+        if value is None:
+            return None
+        return value.to_legacy_urlsafe().decode('utf-8')
+
 
 class BytesProperty(Property):
     """A Datastore property for raw byte data.
@@ -419,6 +436,11 @@ class BytesProperty(Property):
             return zlib.decompress(value)
         return value
 
+    def serialize_value(self, value: bytes) -> str | None:
+        if value is None:
+            return None
+        return base64.b64encode(value).decode('utf-8')
+
 
 class PickleProperty(Property):
     """A Datastore property for storing arbitrary Python objects.
@@ -495,6 +517,11 @@ class PickleProperty(Property):
             value = zlib.decompress(value)
 
         return pickle.loads(value)
+
+    def serialize_value(self, value: Any) -> str | None:
+        if value is None:
+            return None
+        return base64.b64encode(pickle.dumps(value)).decode('utf-8')
 
 
 class StringProperty(Property):
@@ -828,6 +855,11 @@ class DateTimeProperty(Property):
 
         return value
 
+    def serialize_value(self, value: datetime.datetime) -> str | None:
+        if value is None:
+            return None
+        return value.isoformat()
+
 
 class DateProperty(DateTimeProperty):
     """A Datastore property that enforces date values.
@@ -1118,6 +1150,13 @@ class StructuredProperty(Property):
 
         return self.model_class.from_entity(value)
 
+    def serialize_value(self, value: "Model") -> dict | None:
+        """Serialize the nested model into a JSON-safe dictionary."""
+        if value is None:
+            return None
+
+        return value.to_json_dict()
+
 
 class GeoPtProperty(Property):
     """A Datastore property for storing geographical coordinates (latitude and longitude).
@@ -1142,6 +1181,11 @@ class GeoPtProperty(Property):
                 f"google.cloud.datastore.helpers.GeoPoint instance. Got {type(value).__name__}."
             )
         return value
+
+    def serialize_value(self, value: GeoPoint) -> dict | None:
+        if value is None:
+            return None
+        return {"latitude": value.latitude, "longitude": value.longitude}
 
 
 class GenericProperty(Property):
@@ -1225,6 +1269,36 @@ class GenericProperty(Property):
         # Python dict so the developer gets back exactly what they put in.
         if value.__class__.__name__ == 'Entity':
             return dict(value)
+
+        return value
+
+    def serialize_value(self, value: Any) -> Any:
+        """
+        Recursively serialize dynamic data into a JSON-safe structure.
+
+        Because GenericProperty is schema-less, it must check for non-JSON-safe
+        primitives (like datetimes or bytes) on the fly and cast them.
+        """
+        if value is None:
+            return None
+
+        if isinstance(value, (datetime.datetime, datetime.date, datetime.time)):
+            return value.isoformat()
+
+        if isinstance(value, bytes):
+            return base64.b64encode(value).decode('utf-8')
+
+        if isinstance(value, datastore.Key):
+            return value.to_legacy_urlsafe().decode('utf-8')
+
+        if isinstance(value, GeoPoint):
+            return {"latitude": value.latitude, "longitude": value.longitude}
+
+        if isinstance(value, (list, tuple, set)):
+            return [self.serialize_value(item) for item in value]
+
+        if isinstance(value, dict):
+            return {k: self.serialize_value(v) for k, v in value.items()}
 
         return value
 
