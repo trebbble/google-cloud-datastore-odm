@@ -22,10 +22,9 @@ def test_model_invalid_kind():
 
 def test_model_repr_with_key():
     model = KeyTestModel(name="test")
-    assert "id=None" not in repr(model)
-
+    assert "Key('KeyTestModel'" not in repr(model)
     model.allocate_key()
-    assert "id=" in repr(model)
+    assert "<Key('KeyTestModel'" in repr(model)
 
 
 def test_model_to_dict():
@@ -291,12 +290,12 @@ def test_repr_numeric_id():
     instance = ReprModel(id=123, val=5)
 
     repr_str = repr(instance)
-    assert "id=123" in repr_str
+    assert "<Key('Repr', 123)" in repr_str
     assert "val=5" in repr_str
 
     instance = ReprModel(id="123", val=5)
     repr_str = repr(instance)
-    assert "id='123'" in repr_str
+    assert "<Key('Repr', '123')" in repr_str
     assert "val=5" in repr_str
 
 
@@ -698,6 +697,12 @@ def test_multi_tenant_routing_coverage():
             database = "custom-database"
 
     instance = TenantModel()
+
+    repr_str = repr(instance)
+    assert "_project='custom-project'" in repr_str
+    assert "_database='custom-database'" in repr_str
+    assert "_namespace='custom-namespace'" in repr_str
+
     instance.allocate_key()
 
     assert instance.key.project == "custom-project"
@@ -705,9 +710,9 @@ def test_multi_tenant_routing_coverage():
     assert instance.key.namespace == "custom-namespace"
 
     repr_str = repr(instance)
-    assert "project='custom-project'" in repr_str
-    assert "database='custom-database'" in repr_str
-    assert "namespace='custom-namespace'" in repr_str
+    assert "project=custom-project" in repr_str
+    assert "database=custom-database" in repr_str
+    assert "_namespace='custom-namespace'" in repr_str
 
     keys = TenantModel.allocate_ids(1)
     assert keys[0].project == "custom-project"

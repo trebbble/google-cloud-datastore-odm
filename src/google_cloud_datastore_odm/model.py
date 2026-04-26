@@ -378,38 +378,30 @@ class Model(metaclass=ModelMeta):
 
     def __repr__(self) -> str:
         """Return a string representation of the model instance."""
-        meta_parts = []
+        parts = []
 
-        if self._kind != self.__class__.__name__:
-            meta_parts.append(f"kind={self._kind!r}")
+        if self.key:
+            parts.append(f"key={self.key!r}")
 
-        project = self.key.project if self.key else self._project
-        database = self.key.database if self.key else self._database
-        namespace = self.key.namespace if self.key else self._namespace
+            if self.key.namespace:
+                parts.append(f"_namespace={self.key.namespace!r}")
+        else:
+            if self._kind != self.__class__.__name__:
+                parts.append(f"_kind={self._kind!r}")
+            if self._project:
+                parts.append(f"_project={self._project!r}")
+            if self._database:
+                parts.append(f"_database={self._database!r}")
+            if self._namespace:
+                parts.append(f"_namespace={self._namespace!r}")
 
-        if project:
-            meta_parts.append(f"project={project!r}")
-        if database:
-            meta_parts.append(f"database={database!r}")
-        if namespace:
-            meta_parts.append(f"namespace={namespace!r}")
+        for py_name in self._properties:
+            if py_name in self._values:
+                val = self._values[py_name]
+                val_repr = repr(val)
+                parts.append(f"{py_name}={val_repr}")
 
-        meta_str = f"Meta({', '.join(meta_parts)})" if meta_parts else ""
-        id_str = f"id={self.key.id_or_name!r}" if self.key and self.key.id_or_name else ""
-
-        property_repr = ", ".join(
-            f"{name}={value!r}" for name, value in self._values.items()
-        )
-
-        parts = [self.__class__.__name__]
-        if meta_str:
-            parts.append(meta_str)
-        if id_str:
-            parts.append(id_str)
-        if property_repr:
-            parts.append(property_repr)
-
-        return f"<{' '.join(parts)}>"
+        return f"{self.__class__.__name__}({', '.join(parts)})"
 
     def __eq__(self, other: Any) -> bool:
         """Strictly compare two entities for equality.

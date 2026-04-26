@@ -34,7 +34,9 @@ class SystemLog(Model):
 
 print("--- Default Meta Routing ---")
 log_default = SystemLog(event="Startup", user_id="system")
+print(log_default)
 log_default.put()
+print(log_default)
 
 print("[SystemLog] Saved using defaults from Meta config:")
 print(f"  - Project: {log_default.key.project}")
@@ -50,7 +52,9 @@ log_tenant = SystemLog(
     database="db-2",
     namespace="tenant-b"
 )
+print(log_tenant)
 log_tenant.put()
+print(log_tenant)
 
 print("[SystemLog] Saved using explicit kwargs to override ad-hoc:")
 print(f"  - Project: {log_tenant.key.project}")
