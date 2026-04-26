@@ -1,13 +1,13 @@
+import base64
 import datetime
+import pickle
 
 import pytest
 from google.cloud import datastore
 from google.cloud.datastore.helpers import GeoPoint
-import base64
-import pickle
 
 from google_cloud_datastore_odm.client import get_client
-from google_cloud_datastore_odm.model import Model, field_validator, field_serializer
+from google_cloud_datastore_odm.model import Model, field_serializer, field_validator
 from google_cloud_datastore_odm.properties import (
     BooleanProperty,
     BytesProperty,

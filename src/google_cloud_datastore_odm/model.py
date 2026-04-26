@@ -472,8 +472,11 @@ class Model(metaclass=ModelMeta):
         """
         result = {}
         for py_name, prop in self._properties.items():
-            if include and py_name not in include: continue
-            if exclude and py_name in exclude: continue
+            if include and py_name not in include:
+                continue
+
+            if exclude and py_name in exclude:
+                continue
 
             val = getattr(self, py_name)
 
