@@ -69,7 +69,6 @@ print(f"[Batch] Saved {len(batch_keys)} entities in one RPC call.")
 fetched_batch = Note.get_multi(batch_keys)
 print(f"[Batch] Fetched {len(fetched_batch)} entities:")
 for entity in fetched_batch:
-    entity: Note
     print(f"Entity with ID '{entity.key.id_or_name}' created at {entity.created_at}")
 
 Note.delete_multi(batch_keys)

@@ -34,7 +34,7 @@ print(json.dumps(UserAccount.get_schema(output_format="full"), indent=2))
 print("\n--- Property Instances ---")
 # Returns actual Property objects
 props = UserAccount.get_schema(output_format="properties")
-print(f"[Introspection] Found {len(props)} Property instances:")
+print(f"[Introspection] Found {len(props)} Property instances")
 
 print("\n--- Named Properties ---")
 # Returns Dict[python_name, Property]

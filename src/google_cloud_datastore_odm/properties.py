@@ -11,10 +11,12 @@ import datetime
 import json
 import pickle
 import zlib
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any, Callable, Generic, TypeVar, overload
 
 from google.cloud import datastore
 from google.cloud.datastore.helpers import GeoPoint
+
+TStruct = TypeVar("TStruct")
 
 if TYPE_CHECKING:
     from .model import Model
@@ -156,6 +158,12 @@ class Property:
         else:
             return self._validate_single_value(instance, value)
 
+    @overload
+    def __get__(self, instance: None, owner: type) -> "Property": ...
+
+    @overload
+    def __get__(self, instance: "Model", owner: type) -> Any: ...
+
     def __get__(self, instance: "Model | None", owner: type) -> Any:
         """Retrieve the property value from the model instance's internal dictionary."""
         if instance is None:
@@ -289,6 +297,17 @@ class KeyProperty(Property):
         ```
     """
 
+    @overload
+    def __get__(self, instance: None, owner: type) -> "KeyProperty":
+        ...
+
+    @overload
+    def __get__(self, instance: "Model", owner: type) -> datastore.Key | None:
+        ...
+
+    def __get__(self, instance: Any, owner: type) -> Any:
+        return super().__get__(instance, owner)
+
     def __init__(
             self,
             kind: str | Any | None = None,
@@ -375,6 +394,17 @@ class BytesProperty(Property):
         ```
     """
 
+    @overload
+    def __get__(self, instance: None, owner: type) -> "BytesProperty":
+        ...
+
+    @overload
+    def __get__(self, instance: "Model", owner: type) -> bytes | None:
+        ...
+
+    def __get__(self, instance: Any, owner: type) -> Any:
+        return super().__get__(instance, owner)
+
     def __init__(
             self,
             compressed: bool = False,
@@ -459,6 +489,17 @@ class PickleProperty(Property):
         ```
     """
 
+    @overload
+    def __get__(self, instance: None, owner: type) -> "PickleProperty":
+        ...
+
+    @overload
+    def __get__(self, instance: "Model", owner: type) -> Any | None:
+        ...
+
+    def __get__(self, instance: Any, owner: type) -> Any:
+        return super().__get__(instance, owner)
+
     def __init__(
             self,
             compressed: bool = False,
@@ -534,6 +575,15 @@ class StringProperty(Property):
         ```
     """
 
+    @overload
+    def __get__(self, instance: None, owner: type) -> "StringProperty": ...
+
+    @overload
+    def __get__(self, instance: Any, owner: type) -> str | None: ...
+
+    def __get__(self, instance: Any, owner: type) -> Any:
+        return super().__get__(instance, owner)
+
     def _validate_type(self, value: Any) -> Any:
         if not isinstance(value, str):
             raise TypeError(f"Property '{self._python_name}' must be str")
@@ -554,6 +604,15 @@ class IntegerProperty(Property):
         ```
     """
 
+    @overload
+    def __get__(self, instance: None, owner: type) -> "IntegerProperty": ...
+
+    @overload
+    def __get__(self, instance: "Model", owner: type) -> int | None: ...
+
+    def __get__(self, instance: Any, owner: type) -> Any:
+        return super().__get__(instance, owner)
+
     def _validate_type(self, value: Any) -> Any:
         if not isinstance(value, int) or isinstance(value, bool):
             raise TypeError(f"Property '{self._python_name}' must be int")
@@ -569,6 +628,15 @@ class BooleanProperty(Property):
             is_active = BooleanProperty(default=True)
         ```
     """
+
+    @overload
+    def __get__(self, instance: None, owner: type) -> "BooleanProperty": ...
+
+    @overload
+    def __get__(self, instance: "Model", owner: type) -> bool | None: ...
+
+    def __get__(self, instance: Any, owner: type) -> Any:
+        return super().__get__(instance, owner)
 
     def _validate_type(self, value: Any) -> Any:
         if not isinstance(value, bool):
@@ -590,6 +658,15 @@ class FloatProperty(Property):
         ```
     """
 
+    @overload
+    def __get__(self, instance: None, owner: type) -> "FloatProperty": ...
+
+    @overload
+    def __get__(self, instance: "Model", owner: type) -> float | None: ...
+
+    def __get__(self, instance: Any, owner: type) -> Any:
+        return super().__get__(instance, owner)
+
     def _validate_type(self, value: Any) -> Any:
         if not isinstance(value, (int, float)) or isinstance(value, bool):
             raise TypeError(f"Property '{self._python_name}' must be a float")
@@ -609,6 +686,15 @@ class TextProperty(StringProperty):
             body = TextProperty(compressed=True)
         ```
     """
+
+    @overload
+    def __get__(self, instance: None, owner: type) -> "TextProperty": ...
+
+    @overload
+    def __get__(self, instance: "Model", owner: type) -> str | None: ...
+
+    def __get__(self, instance: Any, owner: type) -> Any:
+        return super().__get__(instance, owner)
 
     def __init__(
             self,
@@ -677,6 +763,17 @@ class JsonProperty(Property):
             payload = JsonProperty(compressed=True)
         ```
     """
+
+    @overload
+    def __get__(self, instance: None, owner: type) -> "JsonProperty":
+        ...
+
+    @overload
+    def __get__(self, instance: "Model", owner: type) -> dict | list | Any | None:
+        ...
+
+    def __get__(self, instance: Any, owner: type) -> Any:
+        return super().__get__(instance, owner)
 
     def __init__(
             self,
@@ -776,6 +873,17 @@ class DateTimeProperty(Property):
         ```
     """
 
+    @overload
+    def __get__(self, instance: None, owner: type) -> "DateTimeProperty":
+        ...
+
+    @overload
+    def __get__(self, instance: "Model", owner: type) -> datetime.datetime | None:
+        ...
+
+    def __get__(self, instance: Any, owner: type) -> Any:
+        return super().__get__(instance, owner)
+
     def __init__(
             self,
             *,
@@ -874,6 +982,17 @@ class DateProperty(DateTimeProperty):
         ```
     """
 
+    @overload
+    def __get__(self, instance: None, owner: type) -> "DateProperty":
+        ...
+
+    @overload
+    def __get__(self, instance: "Model", owner: type) -> datetime.date | None:
+        ...
+
+    def __get__(self, instance: Any, owner: type) -> Any:
+        return super().__get__(instance, owner)
+
     def __init__(
             self,
             *,
@@ -941,6 +1060,17 @@ class TimeProperty(DateTimeProperty):
     Datastore only supports Datetimes, so this property casts to a Datetime
     on Jan 1, 1970 UTC before saving, and casts back to a Time when reading.
     """
+
+    @overload
+    def __get__(self, instance: None, owner: type) -> "TimeProperty":
+        ...
+
+    @overload
+    def __get__(self, instance: "Model", owner: type) -> datetime.time | None:
+        ...
+
+    def __get__(self, instance: Any, owner: type) -> Any:
+        return super().__get__(instance, owner)
 
     def __init__(
             self,
@@ -1023,7 +1153,7 @@ class NestedPropertyProxy(Property):
         return self.nested_prop._to_base_type(value)
 
 
-class StructuredProperty(Property):
+class StructuredProperty(Property, Generic[TStruct]):
     """A Datastore property that embeds another Model instance.
 
     Maps directly to Datastore's `EmbeddedEntity` data type. Nested models are
@@ -1043,9 +1173,20 @@ class StructuredProperty(Property):
         ```
     """
 
+    @overload
+    def __get__(self, instance: None, owner: type) -> "StructuredProperty[TStruct]":
+        ...
+
+    @overload
+    def __get__(self, instance: "Model", owner: type) -> TStruct | None:
+        ...
+
+    def __get__(self, instance: Any, owner: type) -> Any:
+        return super().__get__(instance, owner)
+
     def __init__(
             self,
-            model_class: type["Model"],
+            model_class: type[TStruct],
             *,
             name: str | None = None,
             indexed: bool = True,
@@ -1173,6 +1314,17 @@ class GeoPtProperty(Property):
         eiffel_tower = Landmark(location=GeoPoint(48.8584, 2.2945))
         ```
     """
+
+    @overload
+    def __get__(self, instance: None, owner: type) -> "GeoPtProperty":
+        ...
+
+    @overload
+    def __get__(self, instance: "Model", owner: type) -> GeoPoint | None:
+        ...
+
+    def __get__(self, instance: Any, owner: type) -> Any:
+        return super().__get__(instance, owner)
 
     def _validate_type(self, value: Any) -> Any:
         if not isinstance(value, GeoPoint):

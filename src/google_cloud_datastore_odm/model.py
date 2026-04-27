@@ -8,7 +8,7 @@ decorators required to define and interact with Datastore entities.
 import copy
 import json
 from collections import defaultdict
-from typing import Any, Callable, ClassVar, Iterator, Literal
+from typing import Any, Callable, ClassVar, Iterator, Literal, TypeVar
 
 from google.cloud import datastore
 
@@ -214,6 +214,9 @@ class ModelMeta(type):
         class_attrs["_unindexed_datastore_names"] = frozenset(unindexed)
 
         return super().__new__(mcs, class_name, base_classes, class_attrs)
+
+
+TModel = TypeVar("TModel", bound="Model")
 
 
 class Model(metaclass=ModelMeta):
@@ -725,7 +728,7 @@ class Model(metaclass=ModelMeta):
                 raise AttributeError(f"Unknown property: {key}")
 
     @classmethod
-    def from_entity(cls, entity: datastore.Entity | None, _is_projected: bool = False) -> "Model | None":
+    def from_entity(cls: type[TModel], entity: datastore.Entity | None, _is_projected: bool = False) -> TModel | None:
         """Create a model instance from a raw datastore Entity.
 
         Args:
@@ -760,7 +763,7 @@ class Model(metaclass=ModelMeta):
         pass
 
     @classmethod
-    def _post_get_hook(cls, key: datastore.Key, instance: "Model | None") -> None:
+    def _post_get_hook(cls: type[TModel], key: datastore.Key, instance: TModel | None) -> None:
         """Runs immediately after an entity is fetched and hydrated into a Python object.
 
         Args:
@@ -789,7 +792,7 @@ class Model(metaclass=ModelMeta):
         pass
 
     @classmethod
-    def get(cls, key: datastore.Key) -> "Model | None":
+    def get(cls: type[TModel], key: datastore.Key) -> TModel | None:
         """Fetch an entity by its Datastore key and hydrate a model instance.
 
         Executes the `_pre_get_hook` before fetching, and the `_post_get_hook`
@@ -820,7 +823,7 @@ class Model(metaclass=ModelMeta):
         return instance
 
     @classmethod
-    def get_by_id(cls, identifier: Any, parent: datastore.Key | None = None) -> "Model | None":
+    def get_by_id(cls: type[TModel], identifier: Any, parent: datastore.Key | None = None) -> TModel | None:
         """Fetch an entity by its string or integer ID.
 
         Args:
@@ -839,11 +842,11 @@ class Model(metaclass=ModelMeta):
 
     @classmethod
     def query(
-            cls,
+            cls: type[TModel],
             project: str | None = None,
             database: str | None = None,
             namespace: str | None = None
-    ) -> Query:
+    ) -> "Query[TModel]":
         """Create a Query object for this model's Datastore kind.
 
         Args:
@@ -967,7 +970,7 @@ class Model(metaclass=ModelMeta):
         self._post_delete_hook(self.key)
 
     @classmethod
-    def get_multi(cls, keys: list[datastore.Key]) -> list["Model | None"]:
+    def get_multi(cls: type[TModel], keys: list[datastore.Key]) -> list[TModel | None]:
         """Fetch multiple entities by their keys in a single RPC call.
 
         Returns a list of model instances in the exact order of the provided keys.
@@ -1005,7 +1008,7 @@ class Model(metaclass=ModelMeta):
         return instances
 
     @classmethod
-    def put_multi(cls, instances: list["Model"]) -> list[datastore.Key]:
+    def put_multi(cls: type[TModel], instances: list[TModel]) -> list[datastore.Key]:
         """Persist multiple model instances in a single batch Datastore operation.
 
         This is significantly faster and more cost-effective than calling `.put()`
@@ -1097,7 +1100,7 @@ class Model(metaclass=ModelMeta):
         return [instance.key for instance in instances]
 
     @classmethod
-    def delete_multi(cls, keys: list[datastore.Key]) -> None:
+    def delete_multi(cls: type[TModel], keys: list[datastore.Key]) -> None:
         """Delete multiple entities by their keys in a single batch Datastore operation.
 
         Args:

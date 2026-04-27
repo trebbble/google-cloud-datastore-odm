@@ -11,7 +11,7 @@ import inspect
 import os
 import warnings
 from collections.abc import Generator
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
 from google.cloud.datastore import query
 from google.cloud.datastore.aggregation import AvgAggregation as Avg
@@ -25,6 +25,9 @@ if TYPE_CHECKING:
 
     from .model import Model
     from .properties import Property
+
+
+TModel = TypeVar("TModel", bound="Model")
 
 
 class Node:
@@ -101,7 +104,7 @@ AND = and_
 OR = or_
 
 
-class Query:
+class Query(Generic[TModel]):
     """The main Query builder for fetching entities from Google Cloud Datastore.
 
     This class provides a fluent, chainable API for building complex Datastore
@@ -110,7 +113,7 @@ class Query:
 
     def __init__(
             self,
-            model_cls: "type[Model]",
+            model_cls: type[TModel],
             project: str | None = None,
             database: str | None = None,
             namespace: str | None = None,
@@ -126,7 +129,7 @@ class Query:
         self._distinct_on: "list[str | Property]" = []
         self._keys_only: bool = False
 
-    def projection(self, *args: "str | Property") -> "Query":
+    def projection(self, *args: "str | Property") -> "Query[TModel]":
         """Sets the projection fields for the query.
 
         Projection queries are significantly faster and cheaper because they
@@ -147,7 +150,7 @@ class Query:
         self._projection.extend(args)
         return self
 
-    def distinct_on(self, *args: "str | Property") -> "Query":
+    def distinct_on(self, *args: "str | Property") -> "Query[TModel]":
         """Sets the fields to use for grouping distinct results.
 
         Args:
@@ -165,7 +168,7 @@ class Query:
         self._distinct_on.extend(args)
         return self
 
-    def keys_only(self) -> "Query":
+    def keys_only(self) -> "Query[TModel]":
         """Marks the query to return only Datastore Keys instead of full entities.
 
         Keys-only queries are incredibly fast and cost-effective. Use them when
@@ -177,7 +180,7 @@ class Query:
         self._keys_only = True
         return self
 
-    def filter(self, *args: "Node | str") -> "Query":
+    def filter(self, *args: "Node | str") -> "Query[TModel]":
         """Adds filters to the query.
 
         Supports both standard ODM `Property` comparisons (recommended) and
@@ -215,7 +218,7 @@ class Query:
                     raise ValueError(f"Invalid filter: {arg}. Use Model.prop == val.")
         return self
 
-    def order(self, *args: "OrderNode | str | Property") -> "Query":
+    def order(self, *args: "OrderNode | str | Property") -> "Query[TModel]":
         """Adds ordering/sorting to the query.
 
         Supports unary operators (`-` for descending, `+` for ascending) directly
@@ -348,7 +351,7 @@ class Query:
             return entity.key
         return self.model_cls.from_entity(entity, _is_projected=is_projected)
 
-    def fetch(self, limit: int | None = None) -> "Generator[Model | datastore.Key, None, None]":
+    def fetch(self, limit: int | None = None) -> "Generator[TModel | datastore.Key, None, None]":
         """Executes the query and yields results.
 
         Args:
@@ -381,7 +384,7 @@ class Query:
             self,
             page_size: int,
             start_cursor: bytes | None = None
-    ) -> "tuple[list[Model | datastore.Key], bytes | None, bool]":
+    ) -> "tuple[list[TModel | datastore.Key], bytes | None, bool]":
         """Fetches a specific page of results, returning metadata needed for pagination.
 
         Args:
@@ -430,7 +433,7 @@ class Query:
 
         return results, next_cursor if has_more else None, has_more
 
-    def get(self) -> "Model | datastore.Key | None":
+    def get(self) -> "TModel | datastore.Key | None":
         """Executes the query and returns the first matching result.
 
         Automatically applies a `limit=1` to the query to ensure maximum efficiency.
