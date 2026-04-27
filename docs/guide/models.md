@@ -72,8 +72,6 @@ class LegacyData(Model):
     status = StringProperty(name="db_status_col")
 ```
 
-### The `_id` and `_parent` Keywords
-
 When instantiating a model, you typically pass the Datastore ID via `id=...` and the parent key via `parent=...`. 
 
 However, if your model explicitly defines properties actually named `id` or `parent`, you must prefix the routing kwargs with an underscore (`_id`, `_parent`) so the ODM knows which one is the Datastore Key routing metadata and which one is the property value:
@@ -94,7 +92,7 @@ doc = Node(
 
 ---
 
-## Dictionary-like Behavior
+## Dict style access
 
 ODM models natively support Python's dictionary protocol. This makes it incredibly easy to integrate with web frameworks (like FastAPI or Flask) or to dynamically iterate over properties.
 
@@ -114,17 +112,45 @@ for prop_name, prop_val in doc.items():
     print(f"{prop_name}: {prop_val}")
 ```
 
-### Serialization
+## Serialization
 
-To instantly convert a model instance back into a clean Python dictionary, use `.to_dict()`. You can specifically include or exclude fields as needed:
+To convert a model instance into native clean Python data structures, use:
+
+- `to_dict`: to native dict with intact types directly from model
+- `to_json_dict`: to serialized dictionary where each property type has a default serializer which can be overriden using the `@field_serializer` decorator
+- `to_json`: same as the above, but returns the stringified dump of the dictionary
+
+You can specifically include or exclude fields as needed.
 
 ```python
-# Dump the entire model
-data = doc.to_dict()
+doc = ComplexEntity(
+    string_val="Test Entity",
+    int_val=42,
+    bool_val=True,
+    float_val=3.14159,
+    text_val="A very long text block that gets compressed.",
+    json_val={"nested": {"key": "value"}, "list": [1, 2, 3]},
+    bytes_val=b"raw binary data",
+    pickle_val={"apple", "banana", "cherry"},  # A Python Set
+    dt_val=datetime.datetime(2025, 4, 26, 12, 30, tzinfo=datetime.timezone.utc),
+    date_val=datetime.date(2025, 4, 26),
+    time_val=datetime.time(12, 30),
+    geo_val=GeoPoint(37.7749, -122.4194),
+    key_val=datastore.Key("TargetNode", "node-123", project="dummy-project"),
+    address=Address(city="San Francisco", zip_code=94105),
+    dynamic_val={"anything": "goes_here", "even_dates": datetime.date.today()}
+)
 
-# Dump specific fields
-safe_data = doc.to_dict(exclude=["internal_secret"])
-targeted_data = doc.to_dict(include=["key_name", "value"])
+# Returns pure Python objects (datetime, bytes, datastore.Key)
+# We use pprint here because json.dumps would throw a TypeError!
+python_dict = doc.to_dict()
+
+# bytes become Base64, datetimes become ISO strings, etc
+# custom @field_serializer decorated fields are serialized as dictated
+json_dict = doc.to_json_dict()
+
+# eeturns the final JSON encoded string
+json_string = doc.to_json(include=["string_val", "dt_val", "date_val", "address"])
 ```
 
 ---

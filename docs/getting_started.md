@@ -110,4 +110,5 @@ high_priority_query = Task.query().filter(
 for open_task in high_priority_query.fetch():
     print(f"URGENT: {open_task.title}")
 ```
+
 ---
