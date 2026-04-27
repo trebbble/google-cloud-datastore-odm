@@ -7,7 +7,7 @@ name = "google-cloud-datastore-odm"
 version = "0.1.0"
 description = "A modern, fully-typed Python ODM for Google Cloud Datastore."
 readme = "README.md"
-requires-python = "==3.14.*"
+requires-python = ">=3.10"
 dependencies = [
     "google-cloud-datastore>=2.24.0",
 ]
