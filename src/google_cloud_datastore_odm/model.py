@@ -15,7 +15,7 @@ from google.cloud import datastore
 from .client import get_client
 from .properties import Property
 from .query import Query
-from .transaction import get_current_transaction
+from .transactions import get_current_transaction
 
 MODEL_VALIDATOR_ATTR = "__model_validator__"
 FIELD_VALIDATOR_ATTR = "__field_validator__"

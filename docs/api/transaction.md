@@ -1,6 +1,6 @@
 # Transaction Reference
 
-::: google_cloud_datastore_odm.transaction
+::: google_cloud_datastore_odm.transactions
     options:
         members:
             - transaction

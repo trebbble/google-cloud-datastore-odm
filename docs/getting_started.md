@@ -9,9 +9,10 @@ We recommend using [`uv`](https://github.com/astral-sh/uv) or standard `pip` to 
 ```bash
 pip install google-cloud-datastore-odm
 ```
+
 ---
 
-## Step 1: Define a Model
+## Define a Model
 
 Models represent your Datastore entities. You define them by subclassing `Model` and declaring `Property` descriptors as class attributes.
 
@@ -31,7 +32,7 @@ By default, the Datastore **Kind** will automatically match the name of your cla
 
 ---
 
-## Step 2: Connect and Save
+## Instantiate model and persist
 
 The ODM automatically connects to Datastore using your environment's default credentials (like the `GOOGLE_CLOUD_PROJECT` variable). You don't need to manually pass connection objects around.
 
@@ -56,7 +57,7 @@ custom_task.put()
 
 ---
 
-## Step 3: Retrieve Data
+## Retrieve Data
 
 You can fetch entities directly if you know their Key or their ID.
 
@@ -76,7 +77,7 @@ if fetched_task:
 
 ---
 
-## Step 4: Update and Delete
+## Update and Delete
 
 Updating an entity is as simple as changing its properties in memory and calling `.put()` again. 
 
@@ -94,7 +95,7 @@ fetched_task.delete()
 
 ---
 
-## Step 5: Querying
+## Querying
 
 The ODM features a powerful, Python-native query builder. Let's find all high-priority tasks that are not yet completed:
 

@@ -24,7 +24,7 @@ from .query import OR as OR
 from .query import Avg, Count, Sum
 from .query import and_ as and_
 from .query import or_ as or_
-from .transaction import get_current_transaction, transaction, transactional
+from .transactions import get_current_transaction, transaction, transactional
 
 __all__ = [
     "Model",

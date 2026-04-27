@@ -5,7 +5,7 @@ from google.api_core.exceptions import Aborted
 from google.cloud import datastore
 
 from google_cloud_datastore_odm import IntegerProperty, Model, StringProperty, transaction, transactional
-from google_cloud_datastore_odm.transaction import get_current_transaction
+from google_cloud_datastore_odm.transactions import get_current_transaction
 from tests.conftest import QueryTestModel
 
 
@@ -114,7 +114,7 @@ def test_transactional_bad_retries():
             pass
 
 
-@patch("google_cloud_datastore_odm.transaction.time.sleep")
+@patch("google_cloud_datastore_odm.transactions.time.sleep")
 def test_transactional_retry_success(mock_sleep, reset_datastore):
     """Ensure the decorator retries on Aborted and eventually succeeds."""
     attempt_tracker = {"count": 0}
@@ -140,7 +140,7 @@ def test_transactional_retry_success(mock_sleep, reset_datastore):
     assert QueryTestModel.query().filter(QueryTestModel.name == "RetryUser").get() is not None
 
 
-@patch("google_cloud_datastore_odm.transaction.time.sleep")
+@patch("google_cloud_datastore_odm.transactions.time.sleep")
 def test_transactional_retry_exhaustion(mock_sleep):
     """Ensure the decorator gives up and raises the exception after max retries."""
     mock_func = MagicMock(side_effect=Aborted("Constant Collision"))
