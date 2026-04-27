@@ -9,9 +9,6 @@ We recommend using [`uv`](https://github.com/astral-sh/uv) or standard `pip` to 
 ```bash
 pip install google-cloud-datastore-odm
 ```
-
-*(Note: If you are testing locally, ensure you have the Google Cloud Datastore Emulator running and your `DATASTORE_EMULATOR_HOST` environment variable set).*
-
 ---
 
 ## Step 1: Define a Model
@@ -112,15 +109,4 @@ high_priority_query = Task.query().filter(
 for open_task in high_priority_query.fetch():
     print(f"URGENT: {open_task.title}")
 ```
-
-*(Note: Datastore requires composite indexes for complex queries. If you run a query against multiple properties and the index doesn't exist, the Google Cloud SDK will provide a URL in your console output to automatically build it for you).*
-
 ---
-
-## Next Steps
-
-You now know the basics! To unlock the true power of the ODM, check out the detailed guides:
-
-* Learn how to structure complex data in the **[Models & Properties](guide/models.md)** guide.
-* Enforce data integrity in the **[Validation & Hooks](guide/validation.md)** guide.
-* Safely handle concurrent updates in the **[Transactions](guide/transactions.md)** guide.

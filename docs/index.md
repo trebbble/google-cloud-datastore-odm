@@ -38,7 +38,7 @@ print(f"Total points scored: {stats['total_score']}")
 
 ### 🏗️ Advanced Data Modeling
 * **NDB Muscle Memory:** Familiar API including `.put()`, `.get()`, `.query()`, and `_pre_put` hooks.
-* **Strict Validation:** Built-in type checking, property-level constraints (`required=True`, `choices`), and custom `@field_validator` and `@model_validator` decorators.
+* **Model and fields Validation:** Built-in type checking, property-level constraints (`required=True`, `choices`), and custom `@field_validator` and `@model_validator` decorators.
 * **Complex Data Types:** Natively embed full models using `StructuredProperty`, or store dynamic data with `JsonProperty` and `PickleProperty`.
 * **Cost Optimization:** Automatically bypass Datastore's 1500-byte index limits and compress massive text or binary payloads using `compressed=True`.
 
@@ -54,22 +54,3 @@ print(f"Total points scored: {stats['total_score']}")
 * **Zero-Overhead Batching:** Native support for `put_multi`, `get_multi`, and `delete_multi` to maximize network efficiency.
 
 ---
-
-## Why this ODM?
-
-The official `google-cloud-datastore` Python SDK is incredibly powerful, but it relies heavily on raw dictionaries (`Entity` objects). This leaves the burden of schema validation, type casting, and default-value assignment entirely up to the developer.
-
-This ODM provides a robust, class-based structure that guarantees your data schema is respected *before* a single network request is made. If you try to save an invalid property, the ODM catches it in memory. If you try to run a query using an unindexed field, the ODM warns you before you waste a database read.
-
----
-
-## Documentation Directory
-
-Ready to dive in? Check out the guides below:
-
-* 🚀 **[Getting Started](getting_started.md):** Installation and basic CRUD operations.
-* 📚 **[Models & Properties](guide/models.md):** Aliasing, dictionaries, compression, and nested data.
-* 🛡️ **[Validation & Hooks](guide/validation.md):** Strict data integrity and database lifecycle events.
-* 🔎 **[Queries & Aggregations](guide/queries.md):** Complex filtering, pagination, and server-side math.
-* 🔄 **[Transactions](guide/transactions.md):** ACID compliance and optimistic concurrency control.
-* 🏢 **[Multi-Tenancy & Routing](guide/routing.md):** Isolating data across namespaces and databases.
