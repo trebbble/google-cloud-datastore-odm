@@ -4,13 +4,27 @@ build-backend = "uv_build"
 
 [project]
 name = "google-cloud-datastore-odm"
-version = "0.1.0"
+version = "0.1.1"
 description = "A modern, fully-typed Python ODM for Google Cloud Datastore."
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "google-cloud-datastore>=2.24.0",
 ]
+license = { text = "MIT" }
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+    "License :: OSI Approved :: MIT License",
+]
+
+[project.urls]
+Homepage = "https://github.com/trebbble/google-cloud-datastore-odm"
+Documentation = "https://trebbble.github.io/google-cloud-datastore-odm/"
+Repository = "https://github.com/trebbble/google-cloud-datastore-odm"
+Issues = "https://github.com/trebbble/google-cloud-datastore-odm/issues"
+Changelog = "https://github.com/trebbble/google-cloud-datastore-odm/releases"
+
 
 [dependency-groups]
 dev = [
@@ -20,7 +34,7 @@ dev = [
     "python-dotenv>=1.2.2",
     "ruff>=0.15.12",
     "genbadge[coverage]>=1.1.1",
-    "zensical>=0.0.36",
+    "zensical>=0.0.37",
     "mkdocstrings-python>=2.0.3",
 ]
 

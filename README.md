@@ -7,72 +7,20 @@ Google Cloud Datastore ODM is a modern, fully-typed Python library that brings t
 ### Documentation
 https://trebbble.github.io/google-cloud-datastore-odm/
 
+### Roadmap
+https://trebbble.github.io/google-cloud-datastore-odm/roadmap/
+
+### Contributing
+https://trebbble.github.io/google-cloud-datastore-odm/contributing/
+
 ---
 
-### Local Setup & Dependencies
-The project uses [`uv`](https://github.com/astral-sh/uv) for lightning-fast dependency management.
-```bash
-# Install the package in editable mode along with all dev dependencies
-uv sync
-# or use makefile commands
-make setup
-```
+## Installation
 
-### Local emulators
+We recommend using [`uv`](https://github.com/astral-sh/uv) or standard `pip` to install the library.
 
 ```bash
-# Start all emulators in the background
-docker compose -f docker-compose.yml up -d --build
-
-# Tear down and wipe data
-docker compose -f docker-compose.yml down --volumes
+pip install google-cloud-datastore-odm
 ```
+---
 
-- Environment variables to connect to emulators
-  - Datastore dev emulator - make sure to set them up in case of local dev; see .env.example:
-    ```bash
-    DATASTORE_EMULATOR_HOST=localhost:10000
-    GOOGLE_CLOUD_PROJECT=google-cloud-datastore-odm-dev
-    ```
-
-  - Datastore tests emulator - hardcoded already in test suite:
-    ```bash
-    DATASTORE_EMULATOR_HOST=localhost:10001
-    GOOGLE_CLOUD_PROJECT=google-cloud-datastore-odm-test
-    ```
-
-- Datastore emulator user interface at `localhost:10002`
-
-
-### Running examples, testing & linting
-
-```bash
-# Start all emulators in the background
-docker compose -f docker-compose.yml up -d --build
-# or start only datastore container dedicated for testing
-docker compose -f docker-compose.yml up -d --build datastore-test
-
-# run examples from examples folder
-uv run python examples/01_properties.py
-
-# run tests with uv
-uv run pytest 
-# or use makefile commands
-make test
-
-# Run tests with coverage and generate an XML report
-uv run pytest --cov=google_cloud_datastore_odm --cov-report=xml --cov-report=term-missing
-# or use makefile commands
-make test-cov
-
-# Run the linter & formatter
-uv run ruff check
-# or use makefile commands
-make lint
-# for autofixes
-uv run ruff check --fix
-```
-
-### Local docs:
-- `uv run zensical serve`
-- Visit at http://localhost:8000

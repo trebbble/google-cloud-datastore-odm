@@ -17,18 +17,44 @@ We use [`uv`](https://github.com/astral-sh/uv) for lightning-fast dependency man
 * uv
 
 ### 2. Installation
-Clone the repository.
+Clone the repository and setup.
+```bash
+git clone https://github.com/trebbble/google-cloud-datastore-odm.git
+cd google-cloud-datastore-odm
 
-    git clone https://github.com/trebbble/google-cloud-datastore-odm.git
-    cd google-cloud-datastore-odm
+# Install the package in editable mode along with all dev dependencies
+uv sync
+# or use makefile commands
+make setup
+```
+
 
 ### 3. Start the Emulators
 You must run the local emulators to execute the test suite, run examples, or develop locally.
+```bash
+# Start all emulators in the background
+docker compose -f docker-compose.yml up -d --build
+# or start only datastore container dedicated for testing
+docker compose -f docker-compose.yml up -d --build datastore-test
+```
 
-    docker compose -f docker-compose.yml up -d --build
+- Environment variables to connect to emulators
+  - Datastore dev emulator - make sure to set them up in case of local dev; see `.env.example`:
+    ```bash
+    DATASTORE_EMULATOR_HOST=localhost:10000
+    GOOGLE_CLOUD_PROJECT=google-cloud-datastore-odm-dev
+    ```
+
+  - Datastore tests emulator - hardcoded already in test suite:
+    ```bash
+    DATASTORE_EMULATOR_HOST=localhost:10001
+    GOOGLE_CLOUD_PROJECT=google-cloud-datastore-odm-test
+    ```
+
+- Access Datastore emulator user interface at `localhost:10002`
 
 ### 🛠️ Development Workflow
-We provide a `Makefile` to simplify common development tasks. You do not need to manually activate the virtual environment if you use these commands. 
+We provide a `Makefile` to simplify common development tasks. 
 Run these from the root directory of the cloned repository.
 
 * **Setup:** Create a virtual environment and install the package in editable mode: `make setup`
@@ -37,6 +63,7 @@ Run these from the root directory of the cloned repository.
 * **Linting:** Run the linter: `make lint`
 * **Docs:** Serve local documentation: `make docs`
 * **Cleanup:** Remove cache and temporary files: `make clean`
+* **Examples** Run examples from related folder: `uv run python examples/01_properties.py`  
 
 ## 🚀 Submitting a Pull Request
 * **Fork** the repository and create your branch from `main`.
@@ -47,4 +74,43 @@ Run these from the root directory of the cloned repository.
 * **Test Locally:** Run `make test-cov` and `make lint` to ensure your changes pass all local checks. 
 * **Open a PR:** Describe your changes in detail, link to any relevant issues, and submit! Our GitHub Actions CI will run the test suite against multiple Python versions.
 
-Thank you for contributing!
+
+## 💾 Commands cheatsheet
+
+```bash
+# Start all emulators in the background
+docker compose -f docker-compose.yml up -d --build
+# or start only datastore container dedicated for testing
+docker compose -f docker-compose.yml up -d --build datastore-test
+
+# run examples from examples folder
+uv run python examples/01_properties.py
+
+# run tests with uv
+uv run pytest 
+# or use makefile commands
+make test
+
+# Run tests with coverage and generate an XML report
+uv run pytest --cov=google_cloud_datastore_odm --cov-report=xml --cov-report=term-missing
+# or use makefile commands
+make test-cov
+
+# Run the linter & formatter
+uv run ruff check
+# or use makefile commands
+make lint
+# for autofixes
+uv run ruff check --fix
+
+# local docs
+make docs
+# or 
+uv run zensical serve
+# Access at http://localhost:8000
+
+# cache and temp files cleanup
+make clean
+```
+
+### Thank you for contributing!
