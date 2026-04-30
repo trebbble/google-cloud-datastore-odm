@@ -96,6 +96,11 @@ uv run pytest --cov=google_cloud_datastore_odm --cov-report=xml --cov-report=ter
 # or use makefile commands
 make test-cov
 
+# Run regression tests for python and google-cloud-datastore matrix
+uv run python tests/regression.py
+# or use makefile commands
+make test-regression
+
 # Run the linter & formatter
 uv run ruff check
 # or use makefile commands

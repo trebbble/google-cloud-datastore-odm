@@ -10,6 +10,8 @@ test:
 test-cov:
 	uv run pytest --cov=google_cloud_datastore_odm --cov-report=term-missing --cov-report=xml
 
+test-regression:
+	uv run python tests/regression.py
 lint:
 	uv run ruff check .
 
