@@ -1,0 +1,46 @@
+name: PyPi Publish
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    uses: ./.github/workflows/ci_cd.yml
+
+  regression:
+    uses: ./.github/workflows/regression.yml
+
+  build:
+      name: Build Package
+      needs: [test, regression]
+      runs-on: ubuntu-latest
+      steps:
+        - uses: actions/checkout@v6
+        - name: Install uv
+          uses: astral-sh/setup-uv@v7
+          with:
+            enable-cache: true
+        - name: Build
+          run: uv build
+        - name: Store artifacts
+          uses: actions/upload-artifact@v6
+          with:
+            name: dist-artifacts
+            path: dist/
+
+  publish-to-pypi:
+    name: Publish to PyPI
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+    permissions:
+      id-token: write
+    steps:
+      - name: Download all the dists
+        uses: actions/download-artifact@v7
+        with:
+          name: dist-artifacts
+          path: dist/
+      - name: Publish distribution 📦 to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1

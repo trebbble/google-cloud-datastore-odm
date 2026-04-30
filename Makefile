@@ -12,6 +12,7 @@ test-cov:
 
 test-regression:
 	uv run python tests/regression.py
+
 lint:
 	uv run ruff check .
 

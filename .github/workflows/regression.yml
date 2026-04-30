@@ -1,0 +1,35 @@
+name: Regression tests
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+  workflow_call:
+
+jobs:
+
+  regression-test:
+     runs-on: ubuntu-latest
+     permissions:
+       contents: write
+     env:
+        UV_PYTHON: "3.14"
+
+     steps:
+       - uses: actions/checkout@v6
+       - name: Install uv
+         uses: astral-sh/setup-uv@v7
+         with:
+           enable-cache: true
+
+       - name: Start Datastore Emulator
+         run: |
+           docker compose -f docker-compose.yml up -d datastore-test
+
+       - name: Run regression tests
+         env:
+           DATASTORE_EMULATOR_HOST: localhost:10001
+           GOOGLE_CLOUD_PROJECT: google-cloud-datastore-odm-test
+         run: uv run python tests/regression.py

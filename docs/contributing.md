@@ -60,6 +60,7 @@ Run these from the root directory of the cloned repository.
 * **Setup:** Create a virtual environment and install the package in editable mode: `make setup`
 * **Test:** Run tests: `make test`
 * **Coverage:** Run tests with coverage: `make test-cov`
+* * **Regression Tests:** Run tests: `make test-regression`
 * **Linting:** Run the linter: `make lint`
 * **Docs:** Serve local documentation: `make docs`
 * **Cleanup:** Remove cache and temporary files: `make clean`

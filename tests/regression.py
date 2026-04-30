@@ -166,7 +166,9 @@ def main():
                     continue
 
                 if is_single_run:
-                    subprocess.run([python_exe, "-m", "pytest"], env=env)
+                    res = subprocess.run([python_exe, "-m", "pytest"], env=env)
+                    if res.returncode != 0:
+                        failed_runs.append((python_version, datastore_version))
                 else:
                     res = run_command([
                         python_exe, "-m", "pytest",
@@ -187,18 +189,21 @@ def main():
     print("\n" + "=" * 50)
     if not failed_runs and not skipped_runs:
         print("\n  🎉 All Regression tests passed successfully! 🎉")
+        sys.exit(0)
     else:
         print(f"\n  ✅ {total_runs - len(failed_runs) - len(skipped_runs)} Regression tests passed")
 
-    if skipped_runs:
-        print(f"\n  ⚠️ {len(skipped_runs)} Regression tests skipped")
-        for python_version, datastore_version in skipped_runs:
-            print(f"[Python {python_version} | google-cloud-datastore @ {datastore_version}]")
+        if skipped_runs:
+            print(f"\n  ⚠️ {len(skipped_runs)} Regression tests skipped")
+            for python_version, datastore_version in skipped_runs:
+                print(f"[Python {python_version} | google-cloud-datastore @ {datastore_version}]")
 
-    if failed_runs:
-        print(f"\n  ❌ {len(failed_runs)} Regression tests failed")
-        for python_version, datastore_version in failed_runs:
-            print(f"[Python {python_version} | google-cloud-datastore @ {datastore_version}]")
+        if failed_runs:
+            print(f"\n  ❌ {len(failed_runs)} Regression tests failed")
+            for python_version, datastore_version in failed_runs:
+                print(f"[Python {python_version} | google-cloud-datastore @ {datastore_version}]")
+
+        sys.exit(1)
 
 
 if __name__ == "__main__":

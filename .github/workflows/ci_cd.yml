@@ -5,9 +5,11 @@ on:
     branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
-  release:
-    types: [published]
-  workflow_dispatch: # Allows manual triggering
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: write
 
 jobs:
   quality:
@@ -23,16 +25,13 @@ jobs:
           run: uvx ruff check --output-format=github .
 
   test:
+     name: Test & Coverage
      needs: quality
      runs-on: ubuntu-latest
      permissions:
        contents: write
-     strategy:
-       matrix:
-         python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
-
      env:
-        UV_PYTHON: ${{ matrix.python-version }}
+        UV_PYTHON: "3.14"
 
      steps:
        - uses: actions/checkout@v6
@@ -55,48 +54,12 @@ jobs:
          run: uv run pytest --cov=google_cloud_datastore_odm --cov-report=xml --cov-report=term-missing
 
        - name: Generate Coverage Badge
-         if: matrix.python-version == '3.14' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
          run: uv run genbadge coverage -i coverage.xml -o coverage.svg
 
        - name: Commit Coverage Badge
-         if: matrix.python-version == '3.14' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
          uses: stefanzweifel/git-auto-commit-action@v7
          with:
            commit_message: "chore: auto-update coverage badge [skip actions]"
            file_pattern: coverage.svg
-
-  build:
-      name: Build Package
-      needs: test
-      runs-on: ubuntu-latest
-      steps:
-        - uses: actions/checkout@v6
-        - name: Install uv
-          uses: astral-sh/setup-uv@v7
-          with:
-            enable-cache: true
-        - name: Build
-          run: uv build
-        - name: Store artifacts
-          uses: actions/upload-artifact@v6
-          with:
-            name: dist-artifacts
-            path: dist/
-
-  publish-to-pypi:
-    name: Publish to PyPI
-    if: github.event_name == 'release' && github.event.action == 'published'
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: pypi
-    permissions:
-      id-token: write
-    steps:
-      - name: Download all the dists
-        uses: actions/download-artifact@v7
-        with:
-          name: dist-artifacts
-          path: dist/
-      - name: Publish distribution 📦 to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
