@@ -1,10 +1,10 @@
-name: PyPi Publish
+name: CI/CD
 
 on:
   workflow_dispatch:
 
 jobs:
-  test:
+  ci:
     uses: ./.github/workflows/ci.yml
 
   regression:
@@ -12,7 +12,7 @@ jobs:
 
   build:
       name: Build Package
-      needs: [test, regression]
+      needs: [ci, regression]
       runs-on: ubuntu-latest
       steps:
         - uses: actions/checkout@v6

@@ -1,4 +1,4 @@
-name: Regression tests
+name: Regression Tests
 
 on:
   push:
@@ -10,7 +10,7 @@ on:
 
 jobs:
 
-  regression-test:
+  regression:
      runs-on: ubuntu-latest
      permissions:
        contents: write
