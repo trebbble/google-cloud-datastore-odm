@@ -11,11 +11,11 @@ requires-python = ">=3.10"
 dependencies = [
     "google-cloud-datastore>=2.20.1",
 ]
-license = { text = "MIT" }
+license = "MIT"
+license-files = ["LICENSE"]
 classifiers = [
     "Programming Language :: Python :: 3",
-    "Operating System :: OS Independent",
-    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent"
 ]
 
 [project.urls]
