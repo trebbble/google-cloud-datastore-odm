@@ -4,22 +4,26 @@ Local CI Matrix Runner for Google Cloud Datastore ODM.
 Tests multiple Python versions against multiple Datastore SDK versions using `uv`.
 """
 
+import argparse
 import json
 import os
 import shutil
 import subprocess
 import sys
 import urllib.request
-from typing import List
+from typing import List, Tuple
 
-PYTHON_VERSIONS = ["3.10", "3.11", "3.12", "3.13", "3.14"]
-MIN_DATASTORE_VERSION = (2, 20, 1)
+BASE_PYTHON_VERSIONS = ["3.10", "3.11", "3.12", "3.13", "3.14"]
 MATRIX_DIR = ".venv-regression-matrix"
 
 
-def fetch_datastore_versions(min_version=MIN_DATASTORE_VERSION) -> List[str]:
+def parse_version(v: str) -> Tuple[int, ...]:
+    """Helper to convert a string version '2.20.1' into a math-comparable tuple (2, 20, 1)."""
+    return tuple(int(x) for x in v.split(".") if x.isdigit())
+
+
+def fetch_datastore_versions():
     """Fetches and sorts stable releases of google-cloud-datastore from PyPI."""
-    print("  🌐  Fetching Datastore versions from PyPI...")
     url = "https://pypi.org/pypi/google-cloud-datastore/json"
 
     try:
@@ -31,30 +35,71 @@ def fetch_datastore_versions(min_version=MIN_DATASTORE_VERSION) -> List[str]:
 
     versions = []
     for v in data.get("releases", {}):
+        if any(marker in v for marker in ["rc", "b", "a", "dev"]):
+            continue
         try:
-            parts = tuple(int(x) for x in v.split(".") if x.isdigit())
-            if parts >= MIN_DATASTORE_VERSION:
-                versions.append((parts, v))
+            parts = parse_version(v)
+            versions.append((parts, v))
         except ValueError:
             print(f"Could not parse google-cloud-datastore version: {v}, ignoring it.")
 
     versions.sort(key=lambda x: x[0])
-    valid_versions = [v[1] for v in versions]
-    return valid_versions + ["latest"]
+    return versions
 
 
 def run_command(cmd: List[str], env: dict, quiet: bool = True) -> subprocess.CompletedProcess:
     return subprocess.run(cmd, env=env, capture_output=quiet, text=True)
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(description="Run regression matrix against Python and Datastore versions.")
+
+    ds_group = parser.add_mutually_exclusive_group()
+    ds_group.add_argument("--ds-version", type=str,
+                          help="Pinpoint a specific Datastore version (e.g., '2.24.0' or 'latest')")
+    ds_group.add_argument("--min-ds-version", type=str, help="Minimum Datastore version to test (default: 2.20.1)")
+
+    py_group = parser.add_mutually_exclusive_group()
+    py_group.add_argument("--py-version", type=str, choices=BASE_PYTHON_VERSIONS,
+                          help="Pinpoint a specific Python version (e.g., '3.12')")
+    py_group.add_argument("--min-py-version", choices=BASE_PYTHON_VERSIONS,
+                          type=str, help="Minimum Python version to test (default: 3.10)")
+
+    return parser.parse_args()
+
+
 def main():
-    datastore_versions = fetch_datastore_versions()
-    total_runs = len(PYTHON_VERSIONS) * len(datastore_versions)
+    args = parse_args()
+
+    if args.py_version:
+        python_versions = [args.py_version]
+    else:
+        min_py_str = args.min_py_version or "3.10"
+        min_py = parse_version(min_py_str)
+        python_versions = [v for v in BASE_PYTHON_VERSIONS if parse_version(v) >= min_py]
+
+    if args.ds_version:
+        if args.ds_version != "latest":
+            datastore_versions = [args.ds_version]
+        else:
+            datastore_versions = [fetch_datastore_versions()[-1][1]]
+    else:
+        min_ds_str = args.min_ds_version or "2.20.1"
+        min_ds = parse_version(min_ds_str)
+
+        datastore_versions = [
+            v[1]
+            for v in fetch_datastore_versions()
+            if v[0] >= min_ds
+        ]
+
+    is_single_run = len(python_versions) == 1 and len(datastore_versions) == 1
+    total_runs = len(python_versions) * len(datastore_versions)
 
     print("\n" + "=" * 50)
     print(f" 🚀  Regression matrix:\n"
-          f"    x {len(PYTHON_VERSIONS)} Python versions\n"
-          f"    x {len(datastore_versions)} google-cloud-datastore versions\n"
+          f"    x {len(python_versions)} Python versions: {', '.join(python_versions)}\n"
+          f"    x {len(datastore_versions)} google-cloud-datastore versions: {', '.join(datastore_versions)}\n"
           f"    = {total_runs} total runs")
 
     if os.path.exists(MATRIX_DIR):
@@ -65,13 +110,21 @@ def main():
     skipped_runs = []
 
     try:
-        for python_version in PYTHON_VERSIONS:
+        for python_version in python_versions:
             print("\n" + "=" * 50)
-            print(f"    --- 🐍  Python {python_version} ---")
+            if is_single_run:
+                print("\n  ▶️ Running targeted test (Full Pytest Output)...\n")
+            else:
+                print(f"    --- 🐍  Python {python_version} ---")
+
             venv_path = os.path.join(MATRIX_DIR, f"venv-{python_version}")
             python_exe = os.path.join(venv_path, "bin", "python")
+
             env = os.environ.copy()
+            env["VIRTUAL_ENV"] = venv_path
             env["UV_PROJECT_ENVIRONMENT"] = venv_path
+            # Force pure Python Protobuf just in case older SDKs are tested
+            env["PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION"] = "python"
 
             res = run_command(["uv", "venv", venv_path, "--python", python_version], env)
             if res.returncode != 0:
@@ -79,18 +132,16 @@ def main():
                 continue
 
             for datastore_version in datastore_versions:
-                run_command(["uv", "sync"], env)
+                run_command(["uv", "sync", "--python", python_exe], env)
 
-                if datastore_version == "latest":
-                    install_cmd = [
-                        "uv", "pip", "install", "--python", python_exe, "--upgrade", "google-cloud-datastore"
-                    ]
-                else:
-                    install_cmd = [
-                        "uv", "pip", "install", "--python", python_exe, f"google-cloud-datastore=={datastore_version}"
-                    ]
-
-                install_res = run_command(install_cmd, env)
+                install_res = run_command(
+                    [
+                        "uv", "pip", "install",
+                        "--python", python_exe,
+                        f"google-cloud-datastore=={datastore_version}"
+                    ],
+                    env
+                )
                 if install_res.returncode != 0:
                     print(f"⚠️ google-cloud-datastore @ {datastore_version.ljust(8)} : INSTALL FAILED")
                     skipped_runs.append((python_version, datastore_version))
@@ -108,30 +159,29 @@ def main():
                 if datastore_version_cmd.returncode == 0:
                     datastore_version_installed = datastore_version_cmd.stdout.strip()
 
-                target_version = datastore_version if datastore_version != "latest" else datastore_versions[-2]
-                if datastore_version_installed != target_version:
-                    print(f"⚠️ google-cloud-datastore @ {target_version.ljust(8)} "
+                if datastore_version_installed != datastore_version:
+                    print(f"⚠️ google-cloud-datastore @ {datastore_version.ljust(7)} "
                           f": VERSION INSTALLED MISMATCH: {datastore_version_installed}")
-                    skipped_runs.append((python_version, target_version))
+                    skipped_runs.append((python_version, datastore_version))
                     continue
 
-                res = run_command(
-                    [
+                if is_single_run:
+                    subprocess.run([python_exe, "-m", "pytest"], env=env)
+                else:
+                    res = run_command([
                         python_exe, "-m", "pytest",
                         "-q", "--no-header", "-o", "log_cli=false"
-                    ],
-                    env
-                )
+                    ], env)
 
-                if res.returncode == 0:
-                    print(f"  ✅  google-cloud-datastore @ {datastore_version.ljust(7)}: PASSED")
-                else:
-                    print(f"  ❌  google-cloud-datastore @ {datastore_version.ljust(7)}: FAILED")
-                    failed_runs.append((python_version, datastore_version))
+                    if res.returncode == 0:
+                        print(f"  ✅  google-cloud-datastore @ {datastore_version.ljust(7)}: PASSED")
+                    else:
+                        print(f"  ❌  google-cloud-datastore @ {datastore_version.ljust(7)}: FAILED")
+                        failed_runs.append((python_version, datastore_version))
 
     finally:
         print("\n" + "=" * 50)
-        print("\n  🧹 Cleaning up isolated environments...")
+        print("  🧹 Cleaning up isolated environments...")
         shutil.rmtree(MATRIX_DIR, ignore_errors=True)
 
     print("\n" + "=" * 50)
