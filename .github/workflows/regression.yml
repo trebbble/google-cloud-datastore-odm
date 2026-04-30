@@ -32,4 +32,4 @@ jobs:
          env:
            DATASTORE_EMULATOR_HOST: localhost:10001
            GOOGLE_CLOUD_PROJECT: google-cloud-datastore-odm-test
-         run: uv run python tests/regression.py
+         run: uv run python tests/regression.py --ds-version 2.18.0 --py-version 3.14
