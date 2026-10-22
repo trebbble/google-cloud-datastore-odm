@@ -1,24 +1,39 @@
 name: google-cloud-datastore-odm
+# To switch emulators, comment out the active block and uncomment the alternative.
 services:
   datastore-dev:
-    image: gcr.io/google.com/cloudsdktool/google-cloud-cli:emulators
+    # Rust emulator (active)
+    image: guibeira/datastore-emulator:0.1.8
+    working_dir: /datastore
+    stop_signal: SIGINT
+    command: ["--host-port", "0.0.0.0:8081"]
+
+    # Google emulator (alternative)
+    # image: gcr.io/google.com/cloudsdktool/google-cloud-cli:emulators
+    # command: >
+    #   gcloud emulators firestore start
+    #   --database-mode=datastore-mode
+    #   --host-port=0.0.0.0:8081
+
     ports:
       - "10000:8081"
     volumes:
       - datastore-dev:/datastore
-    command: >
-      gcloud emulators firestore start
-      --database-mode=datastore-mode
-      --host-port=0.0.0.0:8081
 
   datastore-test:
-    image: gcr.io/google.com/cloudsdktool/google-cloud-cli:emulators
+    # Rust emulator (active)
+    image: guibeira/datastore-emulator:0.1.8
+    command: ["--host-port", "0.0.0.0:8081", "--no-store-on-disk"]
+
+    # Google emulator (alternative)
+    # image: gcr.io/google.com/cloudsdktool/google-cloud-cli:emulators
+    # command: >
+    #   gcloud emulators firestore start
+    #   --database-mode=datastore-mode
+    #   --host-port=0.0.0.0:8081
+
     ports:
       - "10001:8081"
-    command: >
-      gcloud emulators firestore start
-      --database-mode=datastore-mode
-      --host-port=0.0.0.0:8081
 
   emulators-ui:
     image: ghcr.io/drehelis/gcp-emulator-ui:main
